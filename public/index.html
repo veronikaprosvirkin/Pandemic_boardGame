@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Пандемія Web</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="ui-panel">
+        <h2>Пандемія</h2>
+        <p>Моя роль: <span id="my-role">-</span></p>
+        <p>Місто: <span id="my-city">-</span></p>
+    </div>
+    <!-- Canvas для відмальовки карти, ліній та анімацій -->
+    <canvas id="gameCanvas" width="1200" height="800"></canvas>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

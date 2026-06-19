@@ -1,0 +1,21 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #1a202c; /* Темний океан */
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+#ui-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 15px;
+    border-radius: 8px;
+    pointer-events: none; /* Щоб кліки проходили крізь панель на Canvas */
+}
+
+canvas {
+    display: block;
+}
