@@ -17,5 +17,9 @@
   "bugs": {
     "url": "https://github.com/veronikaprosvirkin/Pandemic_boardGame/issues"
   },
-  "homepage": "https://github.com/veronikaprosvirkin/Pandemic_boardGame#readme"
+  "homepage": "https://github.com/veronikaprosvirkin/Pandemic_boardGame#readme",
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3"
+  }
 }
