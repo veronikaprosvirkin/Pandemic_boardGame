@@ -2,13 +2,18 @@ const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Завантажуємо фон
 const bgImage = new Image();
-bgImage.src = 'map.jpg'; // Назва твоєї картинки в папці public
+bgImage.src = 'map.png';
 
 let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
+
+// КАЛІБРУВАННЯ КАРТИ: 
+// Змінюй ці цифри, щоб посунути всі міста разом і підігнати під свою картинку.
+// Судячи з фото, міста треба підняти десь на 100 пікселів вгору:
+const OFFSET_X = 0;    // від'ємне число - вліво, додатнє - вправо
+const OFFSET_Y = 0; // від'ємне число - вгору, додатнє - вниз
 
 socket.on('init_game', (data) => {
     mapData = data.cities;
@@ -42,43 +47,69 @@ function draw() {
 
     // 2. Малюємо зв'язки (лінії)
     ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // Напівпрозорі білі лінії
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    
+    // Щоб не малювати ту саму лінію двічі
+    const drawnLines = new Set();
+
     for (const [cityName, cityData] of Object.entries(mapData)) {
         cityData.connections.forEach(targetName => {
-            const target = mapData[targetName];
-            if (target) {
-                const dist = Math.hypot(cityData.x - target.x, cityData.y - target.y);
-                // Малюємо лінію ТІЛЬКИ якщо міста не на різних кінцях світу
-                if (dist < 800) { 
-                    ctx.beginPath();
-                    ctx.moveTo(cityData.x, cityData.y);
-                    ctx.lineTo(target.x, target.y);
-                    ctx.stroke();
+            const pairKey = [cityName, targetName].sort().join('-');
+            
+            if (!drawnLines.has(pairKey) && mapData[targetName]) {
+                drawnLines.add(pairKey);
+                
+                const target = mapData[targetName];
+                const startX = cityData.x + OFFSET_X;
+                const startY = cityData.y + OFFSET_Y;
+                const endX = target.x + OFFSET_X;
+                const endY = target.y + OFFSET_Y;
+
+                const dist = Math.hypot(startX - endX, startY - endY);
+
+                ctx.beginPath();
+                if (dist > 800) {
+                    // МІСТА НА РІЗНИХ КІНЦЯХ СВІТУ
+                    const leftCity = startX < endX ? {x: startX, y: startY} : {x: endX, y: endY};
+                    const rightCity = startX > endX ? {x: startX, y: startY} : {x: endX, y: endY};
+
+                    // Лінія від лівого міста за лівий край
+                    ctx.moveTo(leftCity.x, leftCity.y);
+                    ctx.lineTo(-50, leftCity.y);
+                    
+                    // Лінія від правого міста за правий край
+                    ctx.moveTo(rightCity.x, rightCity.y);
+                    ctx.lineTo(canvas.width + 50, rightCity.y);
+                } else {
+                    // Звичайна лінія
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
                 }
+                ctx.stroke();
             }
         });
     }
 
     // 3. Малюємо міста
     for (const [cityName, cityData] of Object.entries(mapData)) {
+        const cx = cityData.x + OFFSET_X;
+        const cy = cityData.y + OFFSET_Y;
+
         ctx.fillStyle = cityData.color;
         ctx.beginPath();
-        ctx.arc(cityData.x, cityData.y, 12, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 12, 0, Math.PI * 2);
         ctx.fill();
         
-        // Обводка для міст
         ctx.lineWidth = 2;
         ctx.strokeStyle = "white";
         ctx.stroke();
         
-        // Назви міст
         ctx.fillStyle = "white";
         ctx.font = "bold 14px Arial";
-        // Тінь для тексту, щоб читалось на будь-якому фоні
         ctx.shadowColor = "black";
         ctx.shadowBlur = 4;
-        ctx.fillText(cityName, cityData.x - 20, cityData.y - 15);
-        ctx.shadowBlur = 0; // вимикаємо тінь для інших елементів
+        ctx.fillText(cityName, cx - 20, cy - 15);
+        ctx.shadowBlur = 0;
     }
 
     // 4. Малюємо гравців
@@ -86,9 +117,12 @@ function draw() {
         Object.values(currentGameState.players).forEach(player => {
             const city = mapData[player.city];
             if (city) {
+                const cx = city.x + OFFSET_X;
+                const cy = city.y + OFFSET_Y;
+
                 ctx.fillStyle = player.id === myPlayerId ? "#48bb78" : "#ed8936";
                 ctx.beginPath();
-                ctx.arc(city.x + 12, city.y + 12, 9, 0, Math.PI * 2);
+                ctx.arc(cx + 12, cy + 12, 9, 0, Math.PI * 2);
                 ctx.fill();
                 ctx.strokeStyle = "white";
                 ctx.stroke();
@@ -99,19 +133,21 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
+// Обробка кліків
 canvas.addEventListener('click', (event) => {
     const rect = canvas.getBoundingClientRect();
-    
-    // Вираховуємо масштаб, оскільки CSS тепер розтягує або звужує canvas
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    // Коригуємо координати миші з урахуванням масштабу
     const mouseX = (event.clientX - rect.left) * scaleX;
     const mouseY = (event.clientY - rect.top) * scaleY;
 
     for (const [cityName, cityData] of Object.entries(mapData)) {
-        const dist = Math.hypot(mouseX - cityData.x, mouseY - cityData.y);
+        // Додаємо OFFSET і для кліків, щоб зона натискання збігалася з відмальованим містом
+        const cx = cityData.x + OFFSET_X;
+        const cy = cityData.y + OFFSET_Y;
+
+        const dist = Math.hypot(mouseX - cx, mouseY - cy);
         if (dist < 20) {
             socket.emit('move_player', cityName);
             break;
