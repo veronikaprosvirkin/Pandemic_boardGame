@@ -129,29 +129,66 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
-// Єдиний обробник кліків
-canvas.addEventListener('click', (e) => {
+// ==========================================
+// ЛОГІКА МИШІ (Перетягування + Рух фішки)
+// ==========================================
+
+let draggedCity = null;
+
+// 1. Коли НАТИСНУЛИ мишку (Беремо місто)
+canvas.addEventListener('mousedown', (e) => {
+    if (!e.altKey) return; // Працює ТІЛЬКИ якщо затиснуто Alt
+
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
     const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    
-    // ЯКЩО ЗАТИСНУТО Alt -> Зберігаємо координати
-    if (e.altKey) {
-        for (const [name, data] of Object.entries(mapData)) {
-            const pos = getCoords(data.x, data.y);
-            if (Math.hypot(x - pos.x, y - pos.y) < 30) {
-                socket.emit('update_city_coords', { name, x: Math.round(x/SCALE_X), y: Math.round(y/SCALE_Y) });
-                console.log(`Місто ${name} успішно збережено у файл cities.json!`);
-                return; // Зупиняємось, щоб фішка не стрибнула туди
-            }
+
+    for (const [name, data] of Object.entries(mapData)) {
+        const pos = getCoords(data.x, data.y);
+        if (Math.hypot(x - pos.x, y - pos.y) < 20) {
+            draggedCity = name;
+            break;
         }
     }
+});
 
-    // ЯКЩО Alt НЕ ЗАТИСНУТО -> Звичайний рух
+// 2. Коли РУХАЄМО мишку (Тягнемо місто за собою)
+canvas.addEventListener('mousemove', (e) => {
+    if (draggedCity) {
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+        // Плавно малюємо місто під мишкою
+        mapData[draggedCity].x = x / SCALE_X;
+        mapData[draggedCity].y = y / SCALE_Y;
+    }
+});
+
+// 3. Коли ВІДПУСТИЛИ мишку (Зберігаємо назавжди)
+canvas.addEventListener('mouseup', () => {
+    if (draggedCity) {
+        socket.emit('update_city_coords', {
+            name: draggedCity,
+            x: Math.round(mapData[draggedCity].x),
+            y: Math.round(mapData[draggedCity].y)
+        });
+        console.log(`Місто ${draggedCity} успішно збережено у файл cities.json!`);
+        draggedCity = null;
+    }
+});
+
+// 4. Звичайний клік для ходу фішкою гравця (без Alt)
+canvas.addEventListener('click', (e) => {
+    if (e.altKey) return; // Якщо ми калібруємо карту, фішку не рухаємо
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
-        const dist = Math.hypot(x - pos.x, y - pos.y);
-        if (dist < 20) {
+        if (Math.hypot(x - pos.x, y - pos.y) < 20) {
             socket.emit('move_player', cityName);
             break;
         }
