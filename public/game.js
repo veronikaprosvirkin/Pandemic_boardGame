@@ -3,21 +3,18 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const bgImage = new Image();
-bgImage.src = 'map.png';
+bgImage.src = 'map.png'; // Твоя актуальна мапа
 
 let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
 
-// --- СИСТЕМА АВТО-МАСШТАБУВАННЯ КАРТИ ---
-// Тобі більше не треба міняти координати кожного міста вручну!
-// Ці 4 змінні дозволяють стиснути/розтягнути або посунути всю сітку міст як один об'єкт.
-const SCALE_X = 1.0;   // 1.0 - стандарт. Якщо міста треба розтягнути по горизонталі - пиши 1.1, якщо стиснути - 0.9
-const SCALE_Y = 0.84;  // Ми стискаємо висоту, бо перейшли з 800 на 675 (675/800 = ~0.84)
-const OFFSET_X = 0;    // Посунути всю сітку вправо/вліво
-const OFFSET_Y = 0;    // Посунути всю сітку вгору/вниз
+// Масштаб зараз 1.0, бо координати вже підігнані
+const SCALE_X = 1.0;
+const SCALE_Y = 1.0;
+const OFFSET_X = 0;
+const OFFSET_Y = 0;
 
-// Математика, яка сама перераховує координати для кожного міста на льоту
 function getCoords(originalX, originalY) {
     return {
         x: (originalX * SCALE_X) + OFFSET_X,
@@ -28,7 +25,10 @@ function getCoords(originalX, originalY) {
 socket.on('init_game', (data) => {
     mapData = data.cities;
     currentGameState = data.gameState;
-    myPlayerId = data.myId;
+    // Оновлюємо ID тільки якщо сервер його прислав (щоб не скинути гравця)
+    if (data.myId) {
+        myPlayerId = data.myId;
+    }
     updateUI();
 });
 
@@ -47,7 +47,6 @@ function updateUI() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 1. Фон
     if (bgImage.complete) {
         ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
     } else {
@@ -55,7 +54,6 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 2. Зв'язки (лінії)
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     const drawnLines = new Set();
@@ -68,14 +66,13 @@ function draw() {
                 drawnLines.add(pairKey);
                 
                 const target = mapData[targetName];
-                // Отримуємо нові перераховані координати для ліній
                 const start = getCoords(cityData.x, cityData.y);
                 const end = getCoords(target.x, target.y);
 
                 const dist = Math.hypot(start.x - end.x, start.y - end.y);
 
                 ctx.beginPath();
-                if (dist > canvas.width * 0.7) { // Якщо лінія йде через океан
+                if (dist > canvas.width * 0.7) { 
                     const leftCity = start.x < end.x ? start : end;
                     const rightCity = start.x > end.x ? start : end;
 
@@ -93,9 +90,7 @@ function draw() {
         });
     }
 
-    // 3. Міста
     for (const [cityName, cityData] of Object.entries(mapData)) {
-        // Отримуємо нові координати для відмальовки міст
         const pos = getCoords(cityData.x, cityData.y);
 
         ctx.fillStyle = cityData.color;
@@ -115,7 +110,6 @@ function draw() {
         ctx.shadowBlur = 0;
     }
 
-    // 4. Гравці
     if (currentGameState.players) {
         Object.values(currentGameState.players).forEach(player => {
             const city = mapData[player.city];
@@ -135,40 +129,31 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
-// Обробка кліків для руху (з урахуванням перерахованих координат)
-canvas.addEventListener('click', (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const mapScaleX = canvas.width / rect.width;
-    const mapScaleY = canvas.height / rect.height;
-
-    const mouseX = (event.clientX - rect.left) * mapScaleX;
-    const mouseY = (event.clientY - rect.top) * mapScaleY;
-
-    for (const [cityName, cityData] of Object.entries(mapData)) {
-        const pos = getCoords(cityData.x, cityData.y);
-
-        const dist = Math.hypot(mouseX - pos.x, mouseY - pos.y);
-        if (dist < 20) {
-            socket.emit('move_player', cityName);
-            break;
-        }
-    }
-});
-// Додай цей блок в кінець файлу public/game.js
+// Єдиний обробник кліків
 canvas.addEventListener('click', (e) => {
-    if (e.altKey) { // Тільки якщо затиснуто Alt
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        
-        // Знаходимо, яке місто найближче
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    
+    // ЯКЩО ЗАТИСНУТО Alt -> Зберігаємо координати
+    if (e.altKey) {
         for (const [name, data] of Object.entries(mapData)) {
             const pos = getCoords(data.x, data.y);
             if (Math.hypot(x - pos.x, y - pos.y) < 30) {
                 socket.emit('update_city_coords', { name, x: Math.round(x/SCALE_X), y: Math.round(y/SCALE_Y) });
-                alert(`Місто ${name} збережено: ${Math.round(x)}, ${Math.round(y)}`);
-                break;
+                console.log(`Місто ${name} успішно збережено у файл cities.json!`);
+                return; // Зупиняємось, щоб фішка не стрибнула туди
             }
+        }
+    }
+
+    // ЯКЩО Alt НЕ ЗАТИСНУТО -> Звичайний рух
+    for (const [cityName, cityData] of Object.entries(mapData)) {
+        const pos = getCoords(cityData.x, cityData.y);
+        const dist = Math.hypot(x - pos.x, y - pos.y);
+        if (dist < 20) {
+            socket.emit('move_player', cityName);
+            break;
         }
     }
 });

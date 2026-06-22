@@ -7,9 +7,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.static('public'));
+app.use(express.static('public')); 
 
-// Завантажуємо міста один раз при старті
+// Читаємо міста з файлу
 let cities = JSON.parse(fs.readFileSync('cities.json', 'utf8'));
 
 let gameState = {
@@ -31,8 +31,20 @@ io.on('connection', (socket) => {
         cards: []
     };
 
+    // Відправляємо клієнту базу міст та його ID
     socket.emit('init_game', { cities, gameState, myId: socket.id });
     socket.broadcast.emit('state_update', gameState);
+
+    // ЗБЕРЕЖЕННЯ КООРДИНАТ У ФАЙЛ
+    socket.on('update_city_coords', (data) => {
+        if (cities[data.name]) {
+            cities[data.name].x = data.x;
+            cities[data.name].y = data.y;
+            fs.writeFileSync('cities.json', JSON.stringify(cities, null, 4));
+            // Відправляємо всім оновлену карту, НЕ стираючи їхній ID
+            io.emit('init_game', { cities, gameState, myId: null }); 
+        }
+    });
 
     socket.on('move_player', (targetCity) => {
         const player = gameState.players[socket.id];
