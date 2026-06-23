@@ -19,8 +19,12 @@ let gameState = {
     currentTurnIndex: 0,
     actionsLeft: 4,
     infectionRate: 2,
-    outbreaks: 0
+    outbreaks: 0,
+    infections: {}
 };
+
+let infectionDeck = [];
+let infectionDiscard = [];
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
 
@@ -56,21 +60,47 @@ io.on('connection', (socket) => {
 
     function checkGameStart() {
         const playersArr = Object.values(gameState.players);
-        // Гра починається, якщо є хоча б 2 гравці і ВСІ натиснули "Готово"
         if (playersArr.length >= 2 && playersArr.every(p => p.isReady)) {
             gameState.status = 'PLAYING';
             
-            // Роздаємо ролі та міста
+            // 1. Очищаємо чергу та роздаємо ролі
+            gameState.turnOrder = [];
+            gameState.currentTurnIndex = 0;
             let availableRoles = [...roles];
+            
             playersArr.forEach(p => {
-                // Вибираємо випадкову роль і видаляємо її зі списку доступних
                 const roleIndex = Math.floor(Math.random() * availableRoles.length);
                 p.role = availableRoles.splice(roleIndex, 1)[0];
-                p.city = "Atlanta"; // Всі стартують в Атланті
-                gameState.turnOrder.push(p.id); // Формуємо чергу
+                p.city = "Atlanta"; 
+                gameState.turnOrder.push(p.id); 
             });
 
-            // Відправляємо всім команду на старт
+            // 2. ІНІЦІАЛІЗАЦІЯ ІНФЕКЦІЇ
+            gameState.infections = {};
+            infectionDeck = Object.keys(cities); // Беремо всі назви міст
+            infectionDiscard = [];
+
+            // Перемішуємо колоду інфекцій (алгоритм Фішера-Йейтса)
+            for (let i = infectionDeck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [infectionDeck[i], infectionDeck[j]] = [infectionDeck[j], infectionDeck[i]];
+            }
+
+            // Функція для витягування міст
+            function infectCities(amountOfCities, cubesToPlace) {
+                for (let i = 0; i < amountOfCities; i++) {
+                    const city = infectionDeck.pop(); // Беремо верхню карту
+                    gameState.infections[city] = cubesToPlace; // Кладемо кубики
+                    infectionDiscard.push(city); // Відправляємо у скид
+                }
+            }
+
+            // Роздаємо кубики за правилами:
+            infectCities(3, 3); // 3 міста по 3 кубики
+            infectCities(3, 2); // 3 міста по 2 кубики
+            infectCities(3, 1); // 3 міста по 1 кубику
+
+            // 3. Відправляємо сигнал про старт гри
             io.emit('game_started', { cities, gameState });
         }
     }

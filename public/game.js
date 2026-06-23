@@ -15,6 +15,7 @@ bgImage.src = 'map.png'; // Переконайся, що ім'я файлу ві
 let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
+let visualPlayers = {};
 
 // Масштабування для карти
 const SCALE_X = 1.0;
@@ -210,18 +211,62 @@ function draw() {
         ctx.fillText(cityName, pos.x - 20, pos.y - 15);
         ctx.shadowBlur = 0;
     }
+    // 2.5 Малюємо кубики хвороб
+    if (currentGameState.infections) {
+        for (const [cityName, count] of Object.entries(currentGameState.infections)) {
+            if (count > 0 && mapData[cityName]) {
+                const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
+                const cubeColor = mapData[cityName].color; // Колір кубика відповідає регіону
+
+                for (let i = 0; i < count; i++) {
+                    ctx.fillStyle = cubeColor;
+                    // Біле обведення, щоб кубик виділявся на фоні карти
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.lineWidth = 2;
+                    
+                    // Зміщуємо кубики трохи вниз і ліворуч від центру міста
+                    // i * 14 дозволяє малювати їх в рядок (один за одним)
+                    const cx = pos.x - 20 + (i * 14);
+                    const cy = pos.y + 15;
+                    
+                    // Малюємо квадрат
+                    ctx.fillRect(cx, cy, 12, 12);
+                    ctx.strokeRect(cx, cy, 12, 12);
+                }
+            }
+        }
+    }
 
     // 3. Гравці
     if (currentGameState.players) {
-        Object.values(currentGameState.players).forEach(player => {
-            const city = mapData[player.city];
-            if (city) {
-                const pos = getCoords(city.x, city.y);
-                // Зелений - якщо це ми, Оранжевий - якщо інший гравець
+        Object.values(currentGameState.players).forEach((player, index) => {
+            const targetCity = mapData[player.city];
+            if (targetCity) {
+                // Якщо фішки ще немає на екрані (гравець щойно зайшов) - ставимо одразу в місто
+                if (!visualPlayers[player.id]) {
+                    visualPlayers[player.id] = { x: targetCity.x, y: targetCity.y };
+                }
+
+                // LERP: Рухаємо фішку на 10% ближче до цілі кожного кадру
+                const speed = 0.1; 
+                visualPlayers[player.id].x += (targetCity.x - visualPlayers[player.id].x) * speed;
+                visualPlayers[player.id].y += (targetCity.y - visualPlayers[player.id].y) * speed;
+
+                // Переводимо логічні координати в екранні
+                const pos = getCoords(visualPlayers[player.id].x, visualPlayers[player.id].y);
+
+                // Щоб фішки не зливалися в одну, якщо стоять в одному місті,
+                // робимо невеликий відступ залежно від їхнього індексу
+                const offsetX = 12 + (index * 6);
+                const offsetY = 12 - (index * 4);
+
+                // Малюємо фішку
                 ctx.fillStyle = player.id === myPlayerId ? "#48bb78" : "#ed8936";
                 ctx.beginPath();
-                ctx.arc(pos.x + 12, pos.y + 12, 9, 0, Math.PI * 2);
+                ctx.arc(pos.x + offsetX, pos.y + offsetY, 9, 0, Math.PI * 2);
                 ctx.fill();
+                
+                ctx.lineWidth = 2;
                 ctx.strokeStyle = "white";
                 ctx.stroke();
             }
