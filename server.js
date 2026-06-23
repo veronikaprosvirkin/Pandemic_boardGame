@@ -89,21 +89,19 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`Гравець відключився: ${socket.id}`);
         
-        // Видаляємо з черги
+        // Видаляємо гравця з черги
         const index = gameState.turnOrder.indexOf(socket.id);
         if (index !== -1) {
             gameState.turnOrder.splice(index, 1);
-            // Якщо вийшов гравець перед нами, треба зсунути індекс черги
-            if (index < gameState.currentTurnIndex) {
+            
+            // Коригуємо індекс черги
+            if (gameState.turnOrder.length === 0) {
+                gameState.currentTurnIndex = 0;
+            } else if (index < gameState.currentTurnIndex) {
                 gameState.currentTurnIndex--;
             } else if (index === gameState.currentTurnIndex) {
-                // Якщо вийшов той, чий зараз був хід
-                gameState.actionsLeft = 4;
-                if (gameState.turnOrder.length > 0) {
-                    gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
-                } else {
-                    gameState.currentTurnIndex = 0;
-                }
+                gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
+                gameState.actionsLeft = 4; // Скидаємо дії для наступного
             }
         }
 
