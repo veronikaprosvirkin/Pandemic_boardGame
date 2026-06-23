@@ -37,12 +37,55 @@ socket.on('state_update', (newState) => {
     updateUI();
 });
 
+const roleDescriptions = {
+    "Медик": "💊 Виліковує всі кубики хвороби одного кольору за 1 дію. Якщо ліки знайдено — лікує автоматично.",
+    "Вчений": "🔬 Для винайдення ліків потрібно лише 4 карти одного кольору замість 5.",
+    "Диспетчер": "🚁 Може рухати чужі фішки як свої. За 1 дію може перемістити будь-яку фішку в місто, де є інша.",
+    "Дослідник": "📑 Може віддати будь-яку карту міста гравцю, який знаходиться з ним в одному місті.",
+    "Фахівець із карантину": "🛑 Запобігає появі нових кубиків хвороб та спалахам у місті, де стоїть, та в усіх сусідніх."
+};
+
 function updateUI() {
     if (!currentGameState.players[myPlayerId]) return;
     const me = currentGameState.players[myPlayerId];
+    
     document.getElementById('my-role').innerText = me.role;
     document.getElementById('my-city').innerText = me.city;
+
+    const descEl = document.getElementById('my-role-desc');
+    if (descEl) descEl.innerText = roleDescriptions[me.role];
+
+    // --- ЛОГІКА ХОДІВ ---
+    // Перевіряємо, чи наш зараз хід
+    const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+    const isMyTurn = (activePlayerId === myPlayerId);
+    const activePlayer = currentGameState.players[activePlayerId];
+
+    const turnIndicator = document.getElementById('turn-indicator');
+    const endTurnBtn = document.getElementById('end-turn-btn');
+    const actionsSpan = document.getElementById('my-actions');
+
+    if (isMyTurn) {
+        turnIndicator.innerText = "🟢 Ваш хід!";
+        turnIndicator.style.color = "#48bb78";
+        actionsSpan.innerText = currentGameState.actionsLeft;
+        actionsSpan.style.color = "#48bb78";
+        endTurnBtn.style.display = "block"; // Показуємо кнопку
+    } else {
+        if (activePlayer) {
+            turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
+        }
+        turnIndicator.style.color = "#f56565";
+        actionsSpan.innerText = "Очікування...";
+        actionsSpan.style.color = "#a0aec0";
+        endTurnBtn.style.display = "none"; // Ховаємо кнопку
+    }
 }
+
+// Обробник натискання кнопки "Завершити хід"
+document.getElementById('end-turn-btn').addEventListener('click', () => {
+    socket.emit('end_turn');
+});
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -132,7 +175,7 @@ function draw() {
 // ==========================================
 // ЛОГІКА МИШІ (Перетягування + Рух фішки)
 // ==========================================
-
+/*
 let draggedCity = null;
 
 // 1. Коли НАТИСНУЛИ мишку (Беремо місто)
@@ -189,6 +232,26 @@ canvas.addEventListener('click', (e) => {
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
         if (Math.hypot(x - pos.x, y - pos.y) < 20) {
+            socket.emit('move_player', cityName);
+            break;
+        }
+    }
+});
+*/
+canvas.addEventListener('click', (e) => {
+    // Якщо зараз не мій хід або закінчилися дії - ігноруємо клік
+    const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
+    if (activePlayerId !== myPlayerId) return;
+    if (currentGameState.actionsLeft <= 0) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    for (const [cityName, cityData] of Object.entries(mapData)) {
+        const pos = getCoords(cityData.x, cityData.y);
+        const dist = Math.hypot(x - pos.x, y - pos.y);
+        if (dist < 20) {
             socket.emit('move_player', cityName);
             break;
         }

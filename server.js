@@ -19,11 +19,23 @@ let gameState = {
     outbreaks: 0
 };
 
-const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник"];
+const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
+
+let gameState = {
+    players: {},
+    turnOrder: [], // Черга гравців (масив їхніх socket.id)
+    currentTurnIndex: 0, // Хто зараз ходить (індекс у масиві)
+    actionsLeft: 4, // Скільки дій залишилося у поточного гравця
+    infectionRate: 2,
+    outbreaks: 0
+};
+
+const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
 
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
 
+    // Присвоюємо роль і початкове місто
     gameState.players[socket.id] = {
         id: socket.id,
         city: "Atlanta",
@@ -31,33 +43,70 @@ io.on('connection', (socket) => {
         cards: []
     };
 
-    // Відправляємо клієнту базу міст та його ID
+    // Додаємо нового гравця в кінець черги
+    gameState.turnOrder.push(socket.id);
+
     socket.emit('init_game', { cities, gameState, myId: socket.id });
     socket.broadcast.emit('state_update', gameState);
 
-    // ЗБЕРЕЖЕННЯ КООРДИНАТ У ФАЙЛ
     socket.on('update_city_coords', (data) => {
         if (cities[data.name]) {
             cities[data.name].x = data.x;
             cities[data.name].y = data.y;
             fs.writeFileSync('cities.json', JSON.stringify(cities, null, 4));
-            // Відправляємо всім оновлену карту, НЕ стираючи їхній ID
             io.emit('init_game', { cities, gameState, myId: null }); 
         }
     });
 
     socket.on('move_player', (targetCity) => {
+        // ПЕРЕВІРКА 1: Чи зараз мій хід?
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        // ПЕРЕВІРКА 2: Чи є в мене дії?
+        if (gameState.actionsLeft <= 0) return;
+
         const player = gameState.players[socket.id];
         const currentCity = cities[player.city];
 
+        // Якщо місто сусіднє - переходимо
         if (currentCity && currentCity.connections.includes(targetCity)) {
             player.city = targetCity;
+            gameState.actionsLeft--; // Віднімаємо 1 дію за рух
             io.emit('state_update', gameState); 
+        }
+    });
+
+    // Нова подія: Гравець натиснув "Завершити хід"
+    socket.on('end_turn', () => {
+        // Перевіряємо, чи це справді його хід, щоб ніхто не "вкрав" хід
+        if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
+            // Передаємо хід наступному по колу
+            gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
+            gameState.actionsLeft = 4; // Відновлюємо 4 дії для наступного
+            io.emit('state_update', gameState);
         }
     });
 
     socket.on('disconnect', () => {
         console.log(`Гравець відключився: ${socket.id}`);
+        
+        // Видаляємо з черги
+        const index = gameState.turnOrder.indexOf(socket.id);
+        if (index !== -1) {
+            gameState.turnOrder.splice(index, 1);
+            // Якщо вийшов гравець перед нами, треба зсунути індекс черги
+            if (index < gameState.currentTurnIndex) {
+                gameState.currentTurnIndex--;
+            } else if (index === gameState.currentTurnIndex) {
+                // Якщо вийшов той, чий зараз був хід
+                gameState.actionsLeft = 4;
+                if (gameState.turnOrder.length > 0) {
+                    gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
+                } else {
+                    gameState.currentTurnIndex = 0;
+                }
+            }
+        }
+
         delete gameState.players[socket.id];
         io.emit('state_update', gameState);
     });
