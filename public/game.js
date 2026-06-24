@@ -10,14 +10,15 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const bgImage = new Image();
-bgImage.src = 'map.png'; // Переконайся, що ім'я файлу відповідає реальному
+bgImage.src = 'map.png';
 
 let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
-let visualPlayers = {};
 
-// Масштабування для карти
+// Зберігає візуальні позиції фішок для плавного перельоту
+let visualPlayers = {}; 
+
 const SCALE_X = 1.0;
 const SCALE_Y = 1.0;
 const OFFSET_X = 0;
@@ -43,7 +44,7 @@ const roleDescriptions = {
 // ==========================================
 
 socket.on('lobby_update', (players) => {
-    lobbyPlayersList.innerHTML = ''; // Очищаємо список
+    lobbyPlayersList.innerHTML = '';
     
     Object.values(players).forEach(p => {
         const li = document.createElement('li');
@@ -71,19 +72,16 @@ socket.on('game_already_started', () => {
 // ==========================================
 
 socket.on('game_started', (data) => {
-    // Зберігаємо свій ID при старті гри
     myPlayerId = socket.id; 
-    
     mapData = data.cities;
     currentGameState = data.gameState;
     
-    // Перемикаємо екрани
     lobbyView.style.display = 'none';
     gameView.style.display = 'flex';
     gameView.style.flexDirection = 'row';
 
     updateUI();
-    draw(); // Запускаємо цикл малювання карти
+    draw(); 
 });
 
 socket.on('state_update', (newState) => {
@@ -105,7 +103,6 @@ function updateUI() {
     const descEl = document.getElementById('my-role-desc');
     if (descEl) descEl.innerText = roleDescriptions[me.role];
 
-    // --- ІНДИКАТОР ХОДУ ---
     if (currentGameState.turnOrder && currentGameState.turnOrder.length > 0) {
         if (currentGameState.currentTurnIndex >= currentGameState.turnOrder.length) {
             currentGameState.currentTurnIndex = 0; 
@@ -115,9 +112,10 @@ function updateUI() {
         const isMyTurn = (activePlayerId === myPlayerId);
         const activePlayer = currentGameState.players[activePlayerId];
 
-        const turnIndicator = document.getElementById('turn-indicator');
+       const turnIndicator = document.getElementById('turn-indicator');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const actionsSpan = document.getElementById('my-actions');
+        const btnTreat = document.getElementById('btn-treat'); // Знаходимо кнопку
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
@@ -125,23 +123,30 @@ function updateUI() {
             actionsSpan.innerText = currentGameState.actionsLeft;
             actionsSpan.style.color = "#48bb78";
             endTurnBtn.style.display = "block";
+            
+            // Показуємо кнопку лікування, якщо в місті є кубики
+            if (currentGameState.infections[me.city] > 0) {
+                btnTreat.style.display = "block";
+                // Додаємо підказку на кнопку скільки кубиків зніметься
+                btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
+            } else {
+                btnTreat.style.display = "none";
+            }
+
         } else {
             if (activePlayer) {
                 turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             } else {
-                turnIndicator.innerText = "⏳ Очікування гравців...";
+                turnIndicator.innerText = "⏳ Очікування...";
             }
             turnIndicator.style.color = "#f56565";
             actionsSpan.innerText = "Очікування...";
             actionsSpan.style.color = "#a0aec0";
             endTurnBtn.style.display = "none";
+            btnTreat.style.display = "none"; // Ховаємо, якщо не наш хід
         }
     }
 }
-
-// ==========================================
-// ВІДМАЛЬОВКА КАРТИ (CANVAS)
-// ==========================================
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -153,7 +158,7 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 1. Лінії між містами
+    // 1. Лінії між містами (на самому нижньому шарі)
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     const drawnLines = new Set();
@@ -163,7 +168,6 @@ function draw() {
         
         cityData.connections.forEach(targetName => {
             const pairKey = [cityName, targetName].sort().join('-');
-            
             if (!drawnLines.has(pairKey) && mapData[targetName]) {
                 drawnLines.add(pairKey);
                 
@@ -176,10 +180,8 @@ function draw() {
                 if (dist > canvas.width * 0.7) { 
                     const leftCity = start.x < end.x ? start : end;
                     const rightCity = start.x > end.x ? start : end;
-
                     ctx.moveTo(leftCity.x, leftCity.y);
                     ctx.lineTo(-50, leftCity.y);
-                    
                     ctx.moveTo(rightCity.x, rightCity.y);
                     ctx.lineTo(canvas.width + 50, rightCity.y);
                 } else {
@@ -191,10 +193,11 @@ function draw() {
         });
     }
 
-    // 2. Міста
+    // 2. Міста та текст (середній шар)
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
 
+        // Кружечок міста
         ctx.fillStyle = cityData.color;
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
@@ -204,70 +207,88 @@ function draw() {
         ctx.strokeStyle = "white";
         ctx.stroke();
         
+        // Текст (Назва міста) - розташовуємо під містом
         ctx.fillStyle = "white";
         ctx.font = "bold 14px Arial";
         ctx.shadowColor = "black";
-        ctx.shadowBlur = 4;
-        ctx.fillText(cityName, pos.x - 20, pos.y - 15);
-        ctx.shadowBlur = 0;
+        ctx.shadowBlur = 4; // Легка тінь для читабельності
+        
+        // Вимірюємо ширину тексту, щоб центрувати його відносно кружечка
+        const textWidth = ctx.measureText(cityName).width;
+        ctx.fillText(cityName, pos.x - (textWidth / 2), pos.y + 28);
+        ctx.shadowBlur = 0; // Скидаємо тінь для наступних елементів
     }
-    // 2.5 Малюємо кубики хвороб
+
+    // 3. Кубики інфекцій (малюємо НАД містом)
     if (currentGameState.infections) {
         for (const [cityName, count] of Object.entries(currentGameState.infections)) {
             if (count > 0 && mapData[cityName]) {
                 const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
-                const cubeColor = mapData[cityName].color; // Колір кубика відповідає регіону
+                const cubeColor = mapData[cityName].color;
 
                 for (let i = 0; i < count; i++) {
                     ctx.fillStyle = cubeColor;
-                    // Біле обведення, щоб кубик виділявся на фоні карти
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
                     ctx.lineWidth = 2;
                     
-                    // Зміщуємо кубики трохи вниз і ліворуч від центру міста
-                    // i * 14 дозволяє малювати їх в рядок (один за одним)
-                    const cx = pos.x - 20 + (i * 14);
-                    const cy = pos.y + 15;
+                    // Зміщуємо кубики ВГОРУ від міста, щоб вони не перекривали назву
+                    const cx = pos.x - 18 + (i * 14); // Рядком зліва направо
+                    const cy = pos.y - 30; // Підняли вище
                     
-                    // Малюємо квадрат
+                    // Додаємо тінь кубикам, щоб вони були об'ємними
+                    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
+                    ctx.shadowBlur = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+
                     ctx.fillRect(cx, cy, 12, 12);
                     ctx.strokeRect(cx, cy, 12, 12);
+
+                    // Скидаємо тінь
+                    ctx.shadowBlur = 0;
+                    ctx.shadowOffsetX = 0;
+                    ctx.shadowOffsetY = 0;
                 }
             }
         }
     }
 
-    // 3. Гравці
+    // 4. Гравці (фішки) (найвищий шар, з LERP)
     if (currentGameState.players) {
         Object.values(currentGameState.players).forEach((player, index) => {
             const targetCity = mapData[player.city];
             if (targetCity) {
-                // Якщо фішки ще немає на екрані (гравець щойно зайшов) - ставимо одразу в місто
                 if (!visualPlayers[player.id]) {
                     visualPlayers[player.id] = { x: targetCity.x, y: targetCity.y };
                 }
 
-                // LERP: Рухаємо фішку на 10% ближче до цілі кожного кадру
                 const speed = 0.1; 
                 visualPlayers[player.id].x += (targetCity.x - visualPlayers[player.id].x) * speed;
                 visualPlayers[player.id].y += (targetCity.y - visualPlayers[player.id].y) * speed;
 
-                // Переводимо логічні координати в екранні
                 const pos = getCoords(visualPlayers[player.id].x, visualPlayers[player.id].y);
+                
+                // Зсув фішок: щоб вони стояли навколо міста, а не рівно по центру
+                const angle = (index / Object.keys(currentGameState.players).length) * Math.PI * 2;
+                const radius = 15; // Відстань від центру міста
+                const offsetX = Math.cos(angle) * radius;
+                const offsetY = Math.sin(angle) * radius;
 
-                // Щоб фішки не зливалися в одну, якщо стоять в одному місті,
-                // робимо невеликий відступ залежно від їхнього індексу
-                const offsetX = 12 + (index * 6);
-                const offsetY = 12 - (index * 4);
-
-                // Малюємо фішку
                 ctx.fillStyle = player.id === myPlayerId ? "#48bb78" : "#ed8936";
                 ctx.beginPath();
                 ctx.arc(pos.x + offsetX, pos.y + offsetY, 9, 0, Math.PI * 2);
+                
+                // Тінь для фішок
+                ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+                ctx.shadowBlur = 5;
+                ctx.shadowOffsetY = 3;
                 ctx.fill();
                 
-                ctx.lineWidth = 2;
+                ctx.shadowBlur = 0; // Скидаємо
+                ctx.shadowOffsetY = 0;
+
                 ctx.strokeStyle = "white";
+                ctx.lineWidth = 2;
                 ctx.stroke();
             }
         });
@@ -287,7 +308,6 @@ if (endTurnBtn) {
     });
 }
 
-// --- Alt+Drag для калібрування карти (якщо колись знадобиться) ---
 let draggedCity = null;
 
 canvas.addEventListener('mousedown', (e) => {
@@ -325,14 +345,13 @@ canvas.addEventListener('mouseup', () => {
     }
 });
 
-// --- Звичайний рух по карті ---
 canvas.addEventListener('click', (e) => {
-    if (e.altKey) return; // Якщо тягнемо місто - не рухати фішку
+    if (e.altKey) return; 
     if (currentGameState.status !== 'PLAYING') return;
 
     const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
-    if (activePlayerId !== myPlayerId) return; // Хід не наш
-    if (currentGameState.actionsLeft <= 0) return; // Закінчились дії
+    if (activePlayerId !== myPlayerId) return; 
+    if (currentGameState.actionsLeft <= 0) return; 
 
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -347,3 +366,10 @@ canvas.addEventListener('click', (e) => {
         }
     }
 });
+
+const btnTreat = document.getElementById('btn-treat');
+if (btnTreat) {
+    btnTreat.addEventListener('click', () => {
+        socket.emit('treat_disease');
+    });
+}

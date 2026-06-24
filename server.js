@@ -9,18 +9,17 @@ const io = new Server(server);
 
 app.use(express.static('public')); 
 
-// Читаємо міста з файлу
 let cities = JSON.parse(fs.readFileSync('cities.json', 'utf8'));
 
 let gameState = {
-    status: 'LOBBY', // Новий стан: LOBBY або PLAYING
+    status: 'LOBBY',
     players: {},
     turnOrder: [],
     currentTurnIndex: 0,
     actionsLeft: 4,
     infectionRate: 2,
     outbreaks: 0,
-    infections: {}
+    infections: {} // Зберігає інфекції
 };
 
 let infectionDeck = [];
@@ -31,13 +30,11 @@ const roles = ["Медик", "Вчений", "Диспетчер", "Дослід
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
 
-    // Якщо гра вже йде, не пускаємо нових (або пускаємо як глядачів)
     if (gameState.status === 'PLAYING') {
         socket.emit('game_already_started');
         return;
     }
 
-    // Додаємо гравця в лобі (без ролі і міста)
     gameState.players[socket.id] = {
         id: socket.id,
         isReady: false,
@@ -49,7 +46,6 @@ io.on('connection', (socket) => {
 
     io.emit('lobby_update', gameState.players);
 
-    // Гравець натиснув "Я готовий"
     socket.on('player_ready', () => {
         if (gameState.players[socket.id]) {
             gameState.players[socket.id].isReady = true;
@@ -60,14 +56,16 @@ io.on('connection', (socket) => {
 
     function checkGameStart() {
         const playersArr = Object.values(gameState.players);
-        if (playersArr.length >= 2 && playersArr.every(p => p.isReady)) {
+        
+        if (playersArr.length >= 2 && playersArr.every(p => p.isReady === true)) {
+            console.log("УСІ ГОТОВІ! ПОЧИНАЄМО ГРУ!");
             gameState.status = 'PLAYING';
             
-            // 1. Очищаємо чергу та роздаємо ролі
-            gameState.turnOrder = [];
+            gameState.turnOrder = []; 
             gameState.currentTurnIndex = 0;
+            gameState.actionsLeft = 4;
+
             let availableRoles = [...roles];
-            
             playersArr.forEach(p => {
                 const roleIndex = Math.floor(Math.random() * availableRoles.length);
                 p.role = availableRoles.splice(roleIndex, 1)[0];
@@ -75,43 +73,38 @@ io.on('connection', (socket) => {
                 gameState.turnOrder.push(p.id); 
             });
 
-            // 2. ІНІЦІАЛІЗАЦІЯ ІНФЕКЦІЇ
+            // Ініціалізація інфекцій
             gameState.infections = {};
-            infectionDeck = Object.keys(cities); // Беремо всі назви міст
+            infectionDeck = Object.keys(cities);
             infectionDiscard = [];
 
-            // Перемішуємо колоду інфекцій (алгоритм Фішера-Йейтса)
+            // Перемішування колоди
             for (let i = infectionDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [infectionDeck[i], infectionDeck[j]] = [infectionDeck[j], infectionDeck[i]];
             }
 
-            // Функція для витягування міст
             function infectCities(amountOfCities, cubesToPlace) {
                 for (let i = 0; i < amountOfCities; i++) {
-                    const city = infectionDeck.pop(); // Беремо верхню карту
-                    gameState.infections[city] = cubesToPlace; // Кладемо кубики
-                    infectionDiscard.push(city); // Відправляємо у скид
+                    const city = infectionDeck.pop();
+                    gameState.infections[city] = cubesToPlace;
+                    infectionDiscard.push(city);
                 }
             }
 
-            // Роздаємо кубики за правилами:
-            infectCities(3, 3); // 3 міста по 3 кубики
-            infectCities(3, 2); // 3 міста по 2 кубики
-            infectCities(3, 1); // 3 міста по 1 кубику
+            infectCities(3, 3);
+            infectCities(3, 2);
+            infectCities(3, 1);
 
-            // 3. Відправляємо сигнал про старт гри
             io.emit('game_started', { cities, gameState });
         }
     }
 
-    // ЗБЕРЕЖЕННЯ КООРДИНАТ (калібрування)
     socket.on('update_city_coords', (data) => {
         if (cities[data.name]) {
             cities[data.name].x = data.x;
             cities[data.name].y = data.y;
             fs.writeFileSync('cities.json', JSON.stringify(cities, null, 4));
-            // Відправляємо тільки карту, щоб не скидати стан гри
             io.emit('map_updated', cities); 
         }
     });
@@ -128,6 +121,33 @@ io.on('connection', (socket) => {
             player.city = targetCity;
             gameState.actionsLeft--;
             io.emit('state_update', gameState); 
+        }
+    });
+    
+    socket.on('treat_disease', () => {
+        if (gameState.status !== 'PLAYING') return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (gameState.actionsLeft <= 0) return;
+
+        const player = gameState.players[socket.id];
+        const city = player.city;
+
+        // Перевіряємо, чи є в цьому місті кубики хвороби
+        if (gameState.infections[city] && gameState.infections[city] > 0) {
+            
+            // ОСОБЛИВІСТЬ МЕДИКА: знімає всі кубики за 1 дію
+            if (player.role === "Медик") {
+                gameState.infections[city] = 0;
+                console.log(`Медик (${player.name}) вилікував усі кубики в ${city}!`);
+            } 
+            // ЗВИЧАЙНИЙ ГРАВЕЦЬ: знімає лише 1 кубик
+            else {
+                gameState.infections[city] -= 1;
+                console.log(`${player.role} (${player.name}) зняв 1 кубик в ${city}.`);
+            }
+
+            gameState.actionsLeft--; // Витрачаємо 1 дію
+            io.emit('state_update', gameState); // Оновлюємо всіх
         }
     });
 
@@ -147,18 +167,21 @@ io.on('connection', (socket) => {
             delete gameState.players[socket.id];
             io.emit('lobby_update', gameState.players);
         } else {
-            // Логіка відключення під час гри (видалення з черги)
             const index = gameState.turnOrder.indexOf(socket.id);
             if (index !== -1) {
                 gameState.turnOrder.splice(index, 1);
                 if (gameState.turnOrder.length === 0) {
-                    gameState.status = 'LOBBY'; // Якщо всі вийшли, скидаємо в лобі
+                    gameState.status = 'LOBBY'; 
                     gameState.players = {};
                     gameState.currentTurnIndex = 0;
                 } else if (index < gameState.currentTurnIndex) {
                     gameState.currentTurnIndex--;
                 } else if (index === gameState.currentTurnIndex) {
-                    gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
+                    if (gameState.turnOrder.length > 0) {
+                        gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
+                    } else {
+                        gameState.currentTurnIndex = 0;
+                    }
                     gameState.actionsLeft = 4;
                 }
             }
