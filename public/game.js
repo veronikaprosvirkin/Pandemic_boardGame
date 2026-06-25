@@ -270,7 +270,14 @@ function draw() {
 
     // 5. ГЛОБАЛЬНА ПАНЕЛЬ НА КАРТІ (Північ)
     if (currentGameState.status === 'PLAYING') {
-        const panelWidth = 400;
+        const infRate = currentGameState.infectionRate || 2;
+        const outbrks = currentGameState.outbreaks || 0;
+        const text = `☣️ Швидкість інфекції: ${infRate}      |      💥 Спалахи: ${outbrks} / 8`;
+
+        ctx.font = "bold 18px Arial";
+        const textWidth = ctx.measureText(text).width; // Вимірюємо ширину тексту
+        
+        const panelWidth = textWidth + 40; // Динамічна ширина (+ відступи)
         const panelHeight = 50;
         const panelX = (canvas.width - panelWidth) / 2;
         const panelY = 15;
@@ -289,14 +296,9 @@ function draw() {
         ctx.stroke();
 
         ctx.fillStyle = "white";
-        ctx.font = "bold 18px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        
-        const infRate = currentGameState.infectionRate || 2;
-        const outbrks = currentGameState.outbreaks || 0;
-        
-        ctx.fillText(`☣️ Швидкість інфекції: ${infRate}      |      💥 Спалахи: ${outbrks} / 8`, canvas.width / 2, panelY + (panelHeight / 2));
+        ctx.fillText(text, canvas.width / 2, panelY + (panelHeight / 2));
         
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
@@ -340,4 +342,59 @@ canvas.addEventListener('click', (e) => {
             break;
         }
     }
+});
+
+// ==========================================
+// СИСТЕМА СПЛИВАЮЧИХ ПОВІДОМЛЕНЬ
+// ==========================================
+
+function showNotification(message, bgColor = "#3182ce") {
+    let container = document.getElementById('notifications-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notifications-container';
+        container.style.position = 'fixed';
+        container.style.bottom = '20px';
+        container.style.left = '20px'; // Зліва в кутку
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.gap = '10px';
+        container.style.zIndex = '1000';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.innerText = message;
+    toast.style.background = bgColor;
+    toast.style.color = "white";
+    toast.style.padding = "10px 15px";
+    toast.style.borderRadius = "5px";
+    toast.style.boxShadow = "0 4px 6px rgba(0,0,0,0.3)";
+    toast.style.fontWeight = "bold";
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(-20px)";
+    toast.style.transition = "all 0.3s ease";
+
+    container.appendChild(toast);
+
+    // Анімація появи
+    setTimeout(() => {
+        toast.style.opacity = "1";
+        toast.style.transform = "translateX(0)";
+    }, 10);
+
+    // Зникнення через 3.5 секунди
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateX(-20px)";
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
+}
+
+// Слухаємо сервер, які карти ми витягнули
+socket.on('cards_drawn', (cards) => {
+    cards.forEach(card => {
+        const cityColor = mapData[card] ? mapData[card].color : "#4a5568";
+        showNotification(`Взято карту: ${card}`, cityColor);
+    });
 });

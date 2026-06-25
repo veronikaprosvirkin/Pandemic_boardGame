@@ -24,6 +24,7 @@ let gameState = {
 
 let infectionDeck = [];
 let infectionDiscard = [];
+let playerDeck = [];
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
 
@@ -96,6 +97,22 @@ io.on('connection', (socket) => {
             infectCities(3, 2);
             infectCities(3, 1);
 
+            playerDeck = Object.keys(cities); // Поки що це просто всі міста
+            
+            // Тасуємо колоду гравців
+            for (let i = playerDeck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [playerDeck[i], playerDeck[j]] = [playerDeck[j], playerDeck[i]];
+            }
+
+            // Роздаємо кожному гравцю по 2 стартові карти
+            playersArr.forEach(p => {
+                p.cards = [];
+                for(let i = 0; i < 2; i++) {
+                    if(playerDeck.length > 0) p.cards.push(playerDeck.pop());
+                }
+            });
+
             io.emit('game_started', { cities, gameState });
         }
     }
@@ -142,6 +159,18 @@ io.on('connection', (socket) => {
     socket.on('end_turn', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
+            
+        const player = gameState.players[socket.id];
+            const drawnCards = []; // Масив для повідомлення
+            for(let i = 0; i < 2; i++) {
+                if (playerDeck.length > 0) {
+                    const card = playerDeck.pop();
+                    player.cards.push(card);
+                    drawnCards.push(card);
+                }
+            }
+            
+            io.to(socket.id).emit('cards_drawn', drawnCards);
 
             // Інфекція поширюється
             for (let i = 0; i < gameState.infectionRate; i++) {
