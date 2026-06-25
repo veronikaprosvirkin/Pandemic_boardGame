@@ -19,7 +19,7 @@ let gameState = {
     actionsLeft: 4,
     infectionRate: 2,
     outbreaks: 0,
-    infections: {} // Зберігає інфекції
+    infections: {} 
 };
 
 let infectionDeck = [];
@@ -64,6 +64,7 @@ io.on('connection', (socket) => {
             gameState.turnOrder = []; 
             gameState.currentTurnIndex = 0;
             gameState.actionsLeft = 4;
+            gameState.outbreaks = 0;
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
@@ -78,7 +79,6 @@ io.on('connection', (socket) => {
             infectionDeck = Object.keys(cities);
             infectionDiscard = [];
 
-            // Перемішування колоди
             for (let i = infectionDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [infectionDeck[i], infectionDeck[j]] = [infectionDeck[j], infectionDeck[i]];
@@ -100,15 +100,7 @@ io.on('connection', (socket) => {
         }
     }
 
-    socket.on('update_city_coords', (data) => {
-        if (cities[data.name]) {
-            cities[data.name].x = data.x;
-            cities[data.name].y = data.y;
-            fs.writeFileSync('cities.json', JSON.stringify(cities, null, 4));
-            io.emit('map_updated', cities); 
-        }
-    });
-
+    // РУХ ГРАВЦЯ
     socket.on('move_player', (targetCity) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
@@ -123,7 +115,8 @@ io.on('connection', (socket) => {
             io.emit('state_update', gameState); 
         }
     });
-    
+
+    // ДІЯ: ЛІКУВАННЯ
     socket.on('treat_disease', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
@@ -132,28 +125,44 @@ io.on('connection', (socket) => {
         const player = gameState.players[socket.id];
         const city = player.city;
 
-        // Перевіряємо, чи є в цьому місті кубики хвороби
         if (gameState.infections[city] && gameState.infections[city] > 0) {
-            
-            // ОСОБЛИВІСТЬ МЕДИКА: знімає всі кубики за 1 дію
+            // Медик лікує все
             if (player.role === "Медик") {
                 gameState.infections[city] = 0;
-                console.log(`Медик (${player.name}) вилікував усі кубики в ${city}!`);
-            } 
-            // ЗВИЧАЙНИЙ ГРАВЕЦЬ: знімає лише 1 кубик
-            else {
+            } else {
+                // Інші по 1 кубику
                 gameState.infections[city] -= 1;
-                console.log(`${player.role} (${player.name}) зняв 1 кубик в ${city}.`);
             }
-
-            gameState.actionsLeft--; // Витрачаємо 1 дію
-            io.emit('state_update', gameState); // Оновлюємо всіх
+            gameState.actionsLeft--;
+            io.emit('state_update', gameState);
         }
     });
 
+    // ЗАВЕРШЕННЯ ХОДУ (ФАЗА ІНФЕКЦІЇ)
     socket.on('end_turn', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
+
+            // Інфекція поширюється
+            for (let i = 0; i < gameState.infectionRate; i++) {
+                if (infectionDeck.length > 0) {
+                    const infectedCity = infectionDeck.pop();
+                    infectionDiscard.push(infectedCity);
+
+                    if (gameState.infections[infectedCity] === undefined) {
+                        gameState.infections[infectedCity] = 0;
+                    }
+
+                    if (gameState.infections[infectedCity] >= 3) {
+                        gameState.outbreaks++; // Спалах!
+                        console.log(`💥 СПАЛАХ у місті ${infectedCity}!`);
+                    } else {
+                        gameState.infections[infectedCity]++; // +1 кубик
+                    }
+                }
+            }
+
+            // Передача ходу
             gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
             gameState.actionsLeft = 4;
             io.emit('state_update', gameState);
@@ -162,7 +171,6 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         console.log(`Гравець відключився: ${socket.id}`);
-        
         if (gameState.status === 'LOBBY') {
             delete gameState.players[socket.id];
             io.emit('lobby_update', gameState.players);

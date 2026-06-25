@@ -1,6 +1,6 @@
 const socket = io();
 
-// --- ЕЛЕМЕНТИ ДОМ ---
+// Елементи DOM
 const lobbyView = document.getElementById('lobby-view');
 const gameView = document.getElementById('game-view');
 const btnReady = document.getElementById('btn-ready');
@@ -16,8 +16,7 @@ let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
 
-// Зберігає візуальні позиції фішок для плавного перельоту
-let visualPlayers = {}; 
+let visualPlayers = {}; // Для плавної анімації
 
 const SCALE_X = 1.0;
 const SCALE_Y = 1.0;
@@ -32,20 +31,16 @@ function getCoords(originalX, originalY) {
 }
 
 const roleDescriptions = {
-    "Медик": "💊 Виліковує всі кубики хвороби одного кольору за 1 дію. Якщо ліки знайдено — лікує автоматично.",
-    "Вчений": "🔬 Для винайдення ліків потрібно лише 4 карти одного кольору замість 5.",
-    "Диспетчер": "🚁 Може рухати чужі фішки як свої. За 1 дію може перемістити будь-яку фішку в місто, де є інша.",
-    "Дослідник": "📑 Може віддати будь-яку карту міста гравцю, який знаходиться з ним в одному місті.",
-    "Фахівець із карантину": "🛑 Запобігає появі нових кубиків хвороб та спалахам у місті, де стоїть, та в усіх сусідніх."
+    "Медик": "💊 Виліковує всі кубики хвороби одного кольору за 1 дію.",
+    "Вчений": "🔬 Для винайдення ліків потрібно лише 4 карти.",
+    "Диспетчер": "🚁 Може рухати чужі фішки як свої.",
+    "Дослідник": "📑 Може віддавати карти іншим гравцям.",
+    "Фахівець із карантину": "🛑 Запобігає поширенню хвороб."
 };
 
-// ==========================================
-// ЛОГІКА ЛОБІ
-// ==========================================
-
+// ================== ЛОБІ ==================
 socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
-    
     Object.values(players).forEach(p => {
         const li = document.createElement('li');
         li.style.padding = "10px";
@@ -67,10 +62,7 @@ socket.on('game_already_started', () => {
     lobbyView.innerHTML = "<h2 style='color:#e53e3e;'>Гра вже почалася!</h2><p>Ви не можете приєднатися зараз.</p>";
 });
 
-// ==========================================
-// СТАРТ ГРИ ТА ОНОВЛЕННЯ СТАНУ
-// ==========================================
-
+// ================== СТАРТ ГРИ ==================
 socket.on('game_started', (data) => {
     myPlayerId = socket.id; 
     mapData = data.cities;
@@ -89,10 +81,7 @@ socket.on('state_update', (newState) => {
     updateUI();
 });
 
-socket.on('map_updated', (newMapData) => {
-    mapData = newMapData;
-});
-
+// ================== ІНТЕРФЕЙС (UI) ==================
 function updateUI() {
     if (!currentGameState.players || !currentGameState.players[myPlayerId]) return;
     
@@ -112,10 +101,10 @@ function updateUI() {
         const isMyTurn = (activePlayerId === myPlayerId);
         const activePlayer = currentGameState.players[activePlayerId];
 
-       const turnIndicator = document.getElementById('turn-indicator');
+        const turnIndicator = document.getElementById('turn-indicator');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const actionsSpan = document.getElementById('my-actions');
-        const btnTreat = document.getElementById('btn-treat'); // Знаходимо кнопку
+        const btnTreat = document.getElementById('btn-treat');
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
@@ -123,31 +112,27 @@ function updateUI() {
             actionsSpan.innerText = currentGameState.actionsLeft;
             actionsSpan.style.color = "#48bb78";
             endTurnBtn.style.display = "block";
-            
-            // Показуємо кнопку лікування, якщо в місті є кубики
-            if (currentGameState.infections[me.city] > 0) {
+
+            // Показуємо кнопку лікування, якщо в місті є хвороба
+            if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
                 btnTreat.style.display = "block";
-                // Додаємо підказку на кнопку скільки кубиків зніметься
                 btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
             } else {
                 btnTreat.style.display = "none";
             }
 
         } else {
-            if (activePlayer) {
-                turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
-            } else {
-                turnIndicator.innerText = "⏳ Очікування...";
-            }
+            if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             turnIndicator.style.color = "#f56565";
             actionsSpan.innerText = "Очікування...";
             actionsSpan.style.color = "#a0aec0";
             endTurnBtn.style.display = "none";
-            btnTreat.style.display = "none"; // Ховаємо, якщо не наш хід
+            btnTreat.style.display = "none";
         }
     }
 }
 
+// ================== ВІДМАЛЬОВКА (CANVAS) ==================
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -158,14 +143,13 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 1. Лінії між містами (на самому нижньому шарі)
+    // 1. Лінії
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     const drawnLines = new Set();
 
     for (const [cityName, cityData] of Object.entries(mapData)) {
         if (!cityData.connections) continue;
-        
         cityData.connections.forEach(targetName => {
             const pairKey = [cityName, targetName].sort().join('-');
             if (!drawnLines.has(pairKey) && mapData[targetName]) {
@@ -193,33 +177,29 @@ function draw() {
         });
     }
 
-    // 2. Міста та текст (середній шар)
+    // 2. Міста
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
 
-        // Кружечок міста
         ctx.fillStyle = cityData.color;
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
         ctx.fill();
-        
         ctx.lineWidth = 2;
         ctx.strokeStyle = "white";
         ctx.stroke();
         
-        // Текст (Назва міста) - розташовуємо під містом
         ctx.fillStyle = "white";
         ctx.font = "bold 14px Arial";
-        ctx.shadowColor = "black";
-        ctx.shadowBlur = 4; // Легка тінь для читабельності
-        
-        // Вимірюємо ширину тексту, щоб центрувати його відносно кружечка
         const textWidth = ctx.measureText(cityName).width;
+        
+        ctx.shadowColor = "black";
+        ctx.shadowBlur = 4;
         ctx.fillText(cityName, pos.x - (textWidth / 2), pos.y + 28);
-        ctx.shadowBlur = 0; // Скидаємо тінь для наступних елементів
+        ctx.shadowBlur = 0;
     }
 
-    // 3. Кубики інфекцій (малюємо НАД містом)
+    // 3. Кубики інфекцій (Над містом)
     if (currentGameState.infections) {
         for (const [cityName, count] of Object.entries(currentGameState.infections)) {
             if (count > 0 && mapData[cityName]) {
@@ -231,11 +211,9 @@ function draw() {
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
                     ctx.lineWidth = 2;
                     
-                    // Зміщуємо кубики ВГОРУ від міста, щоб вони не перекривали назву
-                    const cx = pos.x - 18 + (i * 14); // Рядком зліва направо
-                    const cy = pos.y - 30; // Підняли вище
+                    const cx = pos.x - 18 + (i * 14);
+                    const cy = pos.y - 30;
                     
-                    // Додаємо тінь кубикам, щоб вони були об'ємними
                     ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
                     ctx.shadowBlur = 4;
                     ctx.shadowOffsetX = 2;
@@ -244,7 +222,6 @@ function draw() {
                     ctx.fillRect(cx, cy, 12, 12);
                     ctx.strokeRect(cx, cy, 12, 12);
 
-                    // Скидаємо тінь
                     ctx.shadowBlur = 0;
                     ctx.shadowOffsetX = 0;
                     ctx.shadowOffsetY = 0;
@@ -253,7 +230,7 @@ function draw() {
         }
     }
 
-    // 4. Гравці (фішки) (найвищий шар, з LERP)
+    // 4. Гравці (Lerp анімація)
     if (currentGameState.players) {
         Object.values(currentGameState.players).forEach((player, index) => {
             const targetCity = mapData[player.city];
@@ -267,10 +244,8 @@ function draw() {
                 visualPlayers[player.id].y += (targetCity.y - visualPlayers[player.id].y) * speed;
 
                 const pos = getCoords(visualPlayers[player.id].x, visualPlayers[player.id].y);
-                
-                // Зсув фішок: щоб вони стояли навколо міста, а не рівно по центру
                 const angle = (index / Object.keys(currentGameState.players).length) * Math.PI * 2;
-                const radius = 15; // Відстань від центру міста
+                const radius = 15; 
                 const offsetX = Math.cos(angle) * radius;
                 const offsetY = Math.sin(angle) * radius;
 
@@ -278,13 +253,12 @@ function draw() {
                 ctx.beginPath();
                 ctx.arc(pos.x + offsetX, pos.y + offsetY, 9, 0, Math.PI * 2);
                 
-                // Тінь для фішок
                 ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
                 ctx.shadowBlur = 5;
                 ctx.shadowOffsetY = 3;
                 ctx.fill();
                 
-                ctx.shadowBlur = 0; // Скидаємо
+                ctx.shadowBlur = 0; 
                 ctx.shadowOffsetY = 0;
 
                 ctx.strokeStyle = "white";
@@ -294,13 +268,44 @@ function draw() {
         });
     }
 
+    // 5. ГЛОБАЛЬНА ПАНЕЛЬ НА КАРТІ (Північ)
+    if (currentGameState.status === 'PLAYING') {
+        const panelWidth = 400;
+        const panelHeight = 50;
+        const panelX = (canvas.width - panelWidth) / 2;
+        const panelY = 15;
+
+        ctx.fillStyle = "rgba(26, 32, 44, 0.85)";
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 10);
+        } else {
+            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+        }
+        ctx.fill();
+        
+        ctx.strokeStyle = currentGameState.outbreaks >= 6 ? "#e53e3e" : "#4a5568";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = "white";
+        ctx.font = "bold 18px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        
+        const infRate = currentGameState.infectionRate || 2;
+        const outbrks = currentGameState.outbreaks || 0;
+        
+        ctx.fillText(`☣️ Швидкість інфекції: ${infRate}      |      💥 Спалахи: ${outbrks} / 8`, canvas.width / 2, panelY + (panelHeight / 2));
+        
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+    }
+
     requestAnimationFrame(draw);
 }
 
-// ==========================================
-// КЕРУВАННЯ ГРОЮ
-// ==========================================
-
+// ================== ДІЇ ГРАВЦЯ ==================
 const endTurnBtn = document.getElementById('end-turn-btn');
 if (endTurnBtn) {
     endTurnBtn.addEventListener('click', () => {
@@ -308,45 +313,15 @@ if (endTurnBtn) {
     });
 }
 
-let draggedCity = null;
+const btnTreat = document.getElementById('btn-treat');
+if (btnTreat) {
+    btnTreat.addEventListener('click', () => {
+        socket.emit('treat_disease');
+    });
+}
 
-canvas.addEventListener('mousedown', (e) => {
-    if (!e.altKey) return; 
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-    for (const [name, data] of Object.entries(mapData)) {
-        const pos = getCoords(data.x, data.y);
-        if (Math.hypot(x - pos.x, y - pos.y) < 20) {
-            draggedCity = name;
-            break;
-        }
-    }
-});
-
-canvas.addEventListener('mousemove', (e) => {
-    if (draggedCity) {
-        const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-        mapData[draggedCity].x = x / SCALE_X;
-        mapData[draggedCity].y = y / SCALE_Y;
-    }
-});
-
-canvas.addEventListener('mouseup', () => {
-    if (draggedCity) {
-        socket.emit('update_city_coords', {
-            name: draggedCity,
-            x: Math.round(mapData[draggedCity].x),
-            y: Math.round(mapData[draggedCity].y)
-        });
-        draggedCity = null;
-    }
-});
-
+// Рух по карті
 canvas.addEventListener('click', (e) => {
-    if (e.altKey) return; 
     if (currentGameState.status !== 'PLAYING') return;
 
     const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
@@ -366,10 +341,3 @@ canvas.addEventListener('click', (e) => {
         }
     }
 });
-
-const btnTreat = document.getElementById('btn-treat');
-if (btnTreat) {
-    btnTreat.addEventListener('click', () => {
-        socket.emit('treat_disease');
-    });
-}
