@@ -1,0 +1,18 @@
+# Сюди пишемо те, що не треба завантажувати в Git (і мені в чат)
+
+# Залежності Node.js (це найголовніше!)
+node_modules/
+
+# Логи
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Файли операційних систем (якщо ти на Mac або Windows)
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Файли налаштувань редакторів (необов'язково, але корисно)
+.vscode/
+.idea/

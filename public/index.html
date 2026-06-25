@@ -32,16 +32,23 @@
                 <p><strong>Місто:</strong> <span id="my-city"></span></p>
                 <p><strong>Дій:</strong> <span id="my-actions" style="color: #ed8936; font-size: 1.2em; font-weight: bold;">-</span></p>
                 
-                <div id="action-menu" style="margin-top: 15px; border-top: 1px solid #4a5568; padding-top: 10px;">
-                    <button id="btn-treat" style="display: none; width: 100%; padding: 8px; background-color: #3182ce; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.95em; transition: 0.2s;">
+                <div id="action-menu" class="cards-section">
+                    <button id="btn-treat" class="action-button" style="display: none;">
                         💊 Лікувати хворобу
                     </button>
                 </div>
+
+                <div class="cards-section">
+                    <p style="margin-bottom: 5px;"><strong>Ваші карти:</strong></p>
+                    <div id="my-cards-container">
+                        <span class="no-cards-text">Немає карт</span>
+                    </div>
+                </div>
             </div>
 
-            <div class="panel" style="margin-top: 15px; border-top: 2px solid #4a5568; padding-top: 15px;">
-                <h3 id="turn-indicator" style="text-align: center; margin-bottom: 10px;">Очікування...</h3>
-                <button id="end-turn-btn" style="display: none; width: 100%; padding: 10px; background-color: #e53e3e; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1em;">Завершити хід</button>
+            <div class="panel global-stats-panel">
+                <h3 id="turn-indicator" class="global-stats-title">Очікування...</h3>
+                <button id="end-turn-btn" class="action-button" style="display: none;">Завершити хід</button>
             </div>
         </div>
     </div>

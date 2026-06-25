@@ -53,3 +53,105 @@ p {
     margin: 10px 0;
     color: #cbd5e0;
 }
+.global-stats-panel {
+    margin-top: 15px; 
+    border-top: 2px solid #4a5568; 
+    padding-top: 15px;
+}
+
+.global-stats-title {
+    text-align: center; 
+    margin-bottom: 10px;
+}
+
+/* =========================================
+   КНОПКИ ДІЙ
+   ========================================= */
+.action-button {
+    width: 100%; 
+    padding: 8px; 
+    color: white; 
+    border: none; 
+    border-radius: 5px; 
+    font-weight: bold; 
+    cursor: pointer; 
+    font-size: 0.95em; 
+    transition: background-color 0.2s;
+    margin-top: 5px;
+}
+
+#btn-treat {
+    background-color: #3182ce;
+}
+#btn-treat:hover {
+    background-color: #2b6cb0;
+}
+
+#end-turn-btn {
+    background-color: #e53e3e;
+    padding: 10px;
+    font-size: 1em;
+}
+#end-turn-btn:hover {
+    background-color: #c53030;
+}
+
+/* =========================================
+   КАРТКИ НА РУКАХ ГРАВЦЯ
+   ========================================= */
+.cards-section {
+    margin-top: 15px; 
+    border-top: 1px solid #4a5568; 
+    padding-top: 10px;
+}
+
+#my-cards-container {
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 5px;
+}
+
+.player-card {
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.no-cards-text {
+    color: #a0aec0; 
+    font-style: italic; 
+    font-size: 0.9em;
+}
+
+/* =========================================
+   СПЛИВАЮЧІ ПОВІДОМЛЕННЯ (NOTIFICATIONS)
+   ========================================= */
+#notifications-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.toast-message {
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    font-weight: bold;
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: all 0.3s ease;
+}
+
+.toast-message.show {
+    opacity: 1;
+    transform: translateX(0);
+}
