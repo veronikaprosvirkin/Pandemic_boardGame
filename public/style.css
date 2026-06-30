@@ -1,19 +1,13 @@
 body {
     margin: 0;
     padding: 0;
-    background-color: #0d1117; /* Темний фон всієї сторінки */
-    color: white;
+    background-color: #1a202c;
+    color: #e2e8f0;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    display: flex; /* Розташовуємо елементи в рядок */
-    height: 100vh;
-    overflow: hidden; /* Ховаємо смуги прокрутки */
+    overflow: hidden;
 }
 
-.is-hidden {
-    display: none !important;
-}
-
-#lobby-view {
+.flex-center {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -22,37 +16,32 @@ body {
     width: 100%;
 }
 
+.panel {
+    background-color: #2d3748;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
 .lobby-panel {
     width: 400px;
     text-align: center;
 }
 
-.lobby-title {
-    color: #63b3ed;
-}
+.text-blue { color: #63b3ed; }
+.text-gray { color: #a0aec0; }
+.text-orange { color: #ed8936; }
 
-.lobby-subtitle {
-    color: #a0aec0;
-}
-
-#lobby-players {
+.lobby-list {
     list-style: none;
     padding: 0;
     margin: 20px 0;
     text-align: left;
 }
 
-.lobby-player-item {
+.lobby-list li {
     padding: 10px;
     border-bottom: 1px solid #4a5568;
-}
-
-.lobby-player-ready {
-    color: #48bb78;
-}
-
-.lobby-player-waiting {
-    color: #e2e8f0;
 }
 
 .btn-ready {
@@ -68,96 +57,33 @@ body {
     transition: 0.2s;
 }
 
-.btn-ready.is-waiting {
-    background-color: #718096;
-}
-
-#game-view {
-    width: 100%;
-    height: 100vh;
-}
-
-.game-view-active {
-    display: flex;
-    flex-direction: row;
-}
-
-/* Контейнер для самої мапи */
 #game-container {
-    flex-grow: 1; /* Мапа займає весь вільний простір зліва */
+    flex-grow: 1;
     display: flex;
-    justify-content: center;
     align-items: center;
-    background-color: #000; /* Чорний фон під мапою */
+    justify-content: center;
+    position: relative;
 }
 
-/* Налаштування Canvas (Мапи) */
-canvas {
+#gameCanvas {
+    background-color: #1a202c;
     max-width: 100%;
     max-height: 100vh;
-    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); /* Легке світіння навколо мапи */
+    object-fit: contain;
 }
 
-/* Панель інтерфейсу (справа) */
 #ui-panel {
-    width: 300px; /* Фіксована ширина панелі */
+    width: 300px;
     min-width: 300px;
-    background-color: #1a202c;
+    background-color: #2d3748;
     padding: 20px;
-    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.5); /* Тінь вліво */
+    box-shadow: -2px 0 5px rgba(0,0,0,0.5);
     display: flex;
     flex-direction: column;
-    z-index: 10;
+    overflow-y: auto;
 }
 
-.panel {
-    background-color: #2d3748;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-}
-
-h2, h3 {
-    margin-top: 0;
-    color: #e2e8f0;
-}
-
-p {
-    margin: 10px 0;
-    color: #cbd5e0;
-}
-.global-stats-panel {
-    margin-top: 15px; 
-    border-top: 2px solid #4a5568; 
-    padding-top: 15px;
-}
-
-.global-stats-title {
-    text-align: center; 
-    margin-bottom: 10px;
-}
-
-.turn-indicator-active {
-    color: #48bb78;
-}
-
-.turn-indicator-waiting {
-    color: #f56565;
-}
-
-.actions-active {
-    color: #48bb78;
-}
-
-.actions-waiting {
-    color: #a0aec0;
-}
-
-.my-role {
-    color: #4299e1;
-}
-
-.my-role-desc {
+.role-desc {
     font-size: 0.85em;
     color: #a0aec0;
     margin-top: -10px;
@@ -166,70 +92,40 @@ p {
     line-height: 1.3;
 }
 
-.my-actions {
-    color: #ed8936;
+.actions-text {
     font-size: 1.2em;
     font-weight: bold;
 }
 
 /* =========================================
-   КНОПКИ ДІЙ
+   СТАТИСТИКА ТА КАРТИ
    ========================================= */
-.action-button {
-    width: 100%; 
-    padding: 8px; 
-    color: white; 
-    border: none; 
-    border-radius: 5px; 
-    font-weight: bold; 
-    cursor: pointer; 
-    font-size: 0.95em; 
-    transition: background-color 0.2s;
-    margin-top: 5px;
-}
-
-#btn-treat {
-    background-color: #3182ce;
-}
-#btn-treat:hover {
-    background-color: #2b6cb0;
-}
-
-#end-turn-btn {
-    background-color: #e53e3e;
-    padding: 10px;
-    font-size: 1em;
-}
-#end-turn-btn:hover {
-    background-color: #c53030;
-}
-
-/* =========================================
-   КАРТКИ НА РУКАХ ГРАВЦЯ
-   ========================================= */
-.cards-section {
-    margin-top: 15px; 
-    border-top: 1px solid #4a5568; 
-    padding-top: 10px;
-}
-
-.cards-section-spaced {
+.global-stats-panel {
     margin-top: 15px;
+    border-top: 2px solid #4a5568;
+    padding-top: 15px;
 }
 
-.cards-label {
-    margin-bottom: 5px;
+.global-stats-title {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.cards-section {
+    margin-top: 15px;
+    border-top: 1px solid #4a5568;
+    padding-top: 15px;
+}
+
+.bottom-cards-title {
+    margin-bottom: 8px;
     font-size: 0.9em;
-    color: #a0aec0;
-}
-
-.game-started-title {
-    color: #e53e3e;
+    color: #cbd5e0;
 }
 
 #my-cards-container {
-    display: flex; 
-    flex-wrap: wrap; 
+    display: flex;
+    flex-wrap: wrap;
     gap: 5px;
 }
 
@@ -244,10 +140,36 @@ p {
 }
 
 .no-cards-text {
-    color: #a0aec0; 
-    font-style: italic; 
+    color: #a0aec0;
+    font-style: italic;
     font-size: 0.9em;
 }
+
+/* =========================================
+   КНОПКИ ДІЙ
+   ========================================= */
+.action-button {
+    width: 100%;
+    padding: 8px;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.95em;
+    transition: background-color 0.2s;
+    margin-top: 5px;
+}
+
+#btn-treat { background-color: #3182ce; }
+#btn-treat:hover { background-color: #2b6cb0; }
+
+.end-turn-btn {
+    background-color: #e53e3e;
+    padding: 10px;
+    font-size: 1em;
+}
+.end-turn-btn:hover { background-color: #c53030; }
 
 /* =========================================
    СПЛИВАЮЧІ ПОВІДОМЛЕННЯ (NOTIFICATIONS)
@@ -263,18 +185,39 @@ p {
 }
 
 .toast-message {
-    background: var(--toast-bg, #3182ce);
-    color: white;
     padding: 10px 15px;
     border-radius: 5px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.5);
     opacity: 0;
     transform: translateX(-20px);
     transition: all 0.3s ease;
+    font-size: 0.95em;
 }
 
 .toast-message.show {
     opacity: 1;
     transform: translateX(0);
+}
+
+/* Дизайн для різних типів повідомлень */
+.toast-card {
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+    font-weight: bold;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+.toast-infection {
+    background-color: rgba(26, 32, 44, 0.95);
+    color: #fc8181;
+    border-left: 5px solid #e53e3e;
+}
+
+.toast-epidemic {
+    background-color: rgba(116, 42, 42, 0.95);
+    color: white;
+    font-weight: bold;
+    font-size: 1.1em;
+    border: 2px solid #fc8181;
+    text-align: center;
 }

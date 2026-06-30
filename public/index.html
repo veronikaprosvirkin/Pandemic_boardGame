@@ -2,25 +2,22 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Пандемія Web</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="lobby-view" class="lobby-view">
+    <div id="lobby-view" class="flex-center">
         <div class="panel lobby-panel">
-            <h2 class="lobby-title">Зала очікування</h2>
-            <p class="lobby-subtitle">Очікуємо гравців...</p>
-            
-            <ul id="lobby-players"></ul>
-
+            <h2 class="text-blue">Зала очікування</h2>
+            <p class="text-gray">Очікуємо гравців...</p>
+            <ul id="lobby-players" class="lobby-list"></ul>
             <button id="btn-ready" class="btn-ready">
                 Я ГОТОВИЙ
             </button>
         </div>
     </div>
 
-    <div id="game-view" class="game-view is-hidden">
+    <div id="game-view" style="display: none; width: 100%; height: 100vh;">
         <div id="game-container">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
         </div>
@@ -28,13 +25,13 @@
         <div id="ui-panel">
             <div class="panel">
                 <h2>Ваш статус</h2>
-                <p><strong>Роль:</strong> <span id="my-role" class="my-role"></span></p>
-                <p id="my-role-desc" class="my-role-desc"></p>
+                <p><strong>Роль:</strong> <span id="my-role" class="text-blue"></span></p>
+                <p id="my-role-desc" class="role-desc"></p>
                 <p><strong>Місто:</strong> <span id="my-city"></span></p>
-                <p><strong>Дій:</strong> <span id="my-actions" class="my-actions">-</span></p>
+                <p><strong>Дій:</strong> <span id="my-actions" class="text-orange actions-text">-</span></p>
                 
                 <div id="action-menu" class="cards-section">
-                    <button id="btn-treat" class="action-button is-hidden">
+                    <button id="btn-treat" class="action-button" style="display: none;">
                         💊 Лікувати хворобу
                     </button>
                 </div>
@@ -42,10 +39,10 @@
 
             <div class="panel global-stats-panel">
                 <h3 id="turn-indicator" class="global-stats-title">Очікування...</h3>
-                <button id="end-turn-btn" class="action-button is-hidden">Завершити хід</button>
+                <button id="end-turn-btn" class="action-button end-turn-btn" style="display: none;">Завершити хід</button>
                 
-                <div class="cards-section cards-section-spaced">
-                    <p class="cards-label">Ваші карти міст:</p>
+                <div class="cards-section">
+                    <p class="bottom-cards-title"><strong>Ваші карти міст:</strong></p>
                     <div id="my-cards-container">
                         <span class="no-cards-text">Немає карт</span>
                     </div>

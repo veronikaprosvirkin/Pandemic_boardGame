@@ -345,12 +345,11 @@ canvas.addEventListener('click', (e) => {
         }
     }
 });
-
 // ==========================================
 // СИСТЕМА СПЛИВАЮЧИХ ПОВІДОМЛЕНЬ
 // ==========================================
 
-function showNotification(message, bgColor = "#3182ce") {
+function showNotification(message, type = 'card', cityColor = null) {
     let container = document.getElementById('notifications-container');
     if (!container) {
         container = document.createElement('div');
@@ -359,33 +358,49 @@ function showNotification(message, bgColor = "#3182ce") {
     }
 
     const toast = document.createElement('div');
-    toast.innerText = message;
     toast.className = 'toast-message';
-    toast.style.setProperty('--toast-bg', bgColor);
+    toast.innerHTML = message;
+    
+    // Застосовуємо стилі залежно від типу події
+    if (type === 'card') {
+        toast.classList.add('toast-card');
+        toast.style.backgroundColor = cityColor || "#3182ce";
+    } else if (type === 'infection') {
+        toast.classList.add('toast-infection');
+        if (cityColor) toast.style.borderLeftColor = cityColor; // Фарбуємо тільки смужку збоку
+    } else if (type === 'epidemic') {
+        toast.classList.add('toast-epidemic');
+    }
 
     container.appendChild(toast);
 
     // Анімація появи
-    setTimeout(() => {
-        toast.classList.add('show');
-    }, 10);
+    setTimeout(() => toast.classList.add('show'), 10);
 
-    // Зникнення через 3.5 секунди
+    // Зникнення через 4 секунди
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
-    }, 3500);
+    }, 4000);
 }
 
-// Слухаємо сервер, які карти ми витягнули
+// 1. Сповіщення про взяті карти (тільки для поточного гравця)
 socket.on('cards_drawn', (cards) => {
     cards.forEach(card => {
         const cityColor = mapData[card] ? mapData[card].color : "#4a5568";
-        showNotification(`Взято карту: ${card}`, cityColor);
+        showNotification(`🃏 Ви отримали карту:<br><strong>${card}</strong>`, 'card', cityColor);
     });
 });
 
-// Сповіщення для ВСІХ гравців про Епідемію
+// 2. Сповіщення про поширення хвороби (для всіх гравців)
+socket.on('infection_drawn', (citiesList) => {
+    citiesList.forEach(city => {
+        const cityColor = mapData[city] ? mapData[city].color : "#e53e3e";
+        showNotification(`☣️ Інфекція поширюється:<br><strong>${city}</strong>`, 'infection', cityColor);
+    });
+});
+
+// 3. Сповіщення про Епідемію (для всіх гравців)
 socket.on('epidemic_alert', (city) => {
-    showNotification(`⚠️ ЕПІДЕМІЯ В МІСТІ ${city}!`, "#e53e3e"); 
+    showNotification(`⚠️ ЕПІДЕМІЯ В МІСТІ<br><strong>${city}</strong>!`, 'epidemic');
 });

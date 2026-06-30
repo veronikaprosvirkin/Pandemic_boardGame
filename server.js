@@ -198,12 +198,10 @@ io.on('connection', (socket) => {
 
             // --- ОБРОБКА ЕПІДЕМІЙ ---
             for (let e = 0; e < epidemicsDrawn; e++) {
-                // 1. Підвищення: збільшуємо індекс і визначаємо новий рейт
                 gameState.infectionRateIndex++;
                 const rates = [2, 2, 2, 3, 3, 4, 4];
                 gameState.infectionRate = rates[Math.min(gameState.infectionRateIndex, rates.length - 1)];
 
-                // 2. Епідемія: тягнемо з САМОГО НИЗУ (shift)
                 if (infectionDeck.length > 0) {
                     const bottomCity = infectionDeck.shift(); 
                     infectionDiscard.push(bottomCity);
@@ -214,31 +212,29 @@ io.on('connection', (socket) => {
                     
                     gameState.infections[bottomCity] += 3;
                     if (gameState.infections[bottomCity] > 3) {
-                        gameState.outbreaks++; // Спалах!
+                        gameState.outbreaks++; 
                         gameState.infections[bottomCity] = 3;
                     }
                     
-                    // Відправляємо всім червоне сповіщення
                     io.emit('epidemic_alert', bottomCity);
                 }
 
-                // 3. Загострення: тасуємо скид і кладемо ЗВЕРХУ (додаємо в кінець масиву)
                 for (let i = infectionDiscard.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [infectionDiscard[i], infectionDiscard[j]] = [infectionDiscard[j], infectionDiscard[i]];
                 }
                 infectionDeck = infectionDeck.concat(infectionDiscard); 
-                infectionDiscard = []; // Скид порожній
+                infectionDiscard = []; 
             }
 
             // --- 2. ФАЗА ІНФЕКЦІЇ ---
-            const infectedCitiesThisTurn = []; // Масив для сповіщень про інфекцію
-            
+            const infectedCitiesThisTurn = []; // Збираємо міста для сповіщень
+
             for (let i = 0; i < gameState.infectionRate; i++) {
                 if (infectionDeck.length > 0) {
                     const infectedCity = infectionDeck.pop();
                     infectionDiscard.push(infectedCity);
-                    infectedCitiesThisTurn.push(infectedCity); // Додаємо місто в список
+                    infectedCitiesThisTurn.push(infectedCity);
 
                     if (gameState.infections[infectedCity] === undefined) {
                         gameState.infections[infectedCity] = 0;
@@ -252,8 +248,8 @@ io.on('connection', (socket) => {
                     }
                 }
             }
-
-            // Сповіщаємо всіх гравців про нові інфекції
+            
+            // Відправляємо список міст усім гравцям для сповіщень
             io.emit('infection_drawn', infectedCitiesThisTurn);
 
             // --- 3. ПЕРЕДАЧА ХОДУ ---
