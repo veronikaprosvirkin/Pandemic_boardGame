@@ -41,23 +41,46 @@ const roleDescriptions = {
 // ================== ЛОБІ ==================
 socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
+    
+    // Перевіряємо, чи достатньо гравців і чи всі готові
+    let allReady = true;
+    let playerCount = 0;
+
     Object.values(players).forEach(p => {
+        playerCount++;
+        if (!p.isReady) allReady = false;
+
         const li = document.createElement('li');
-        li.className = `lobby-player-item ${p.isReady ? 'lobby-player-ready' : 'lobby-player-waiting'}`;
+        // Додаємо стиль для списку
+        li.style.padding = "10px";
+        li.style.borderBottom = "1px solid #4a5568";
+        li.style.color = p.isReady ? "#48bb78" : "#e2e8f0";
         li.innerHTML = `<strong>${p.name}</strong> - ${p.isReady ? 'Готовий ✔️' : 'Обирає...'}`;
         lobbyPlayersList.appendChild(li);
     });
+
+    // Оновлюємо текст (замість [object...])
+    const statusText = document.getElementById('lobby-status');
+    if (statusText) {
+        if (playerCount < 2) {
+             statusText.innerText = "Очікуємо гравців... (мінімум 2)";
+        } else if (!allReady) {
+             statusText.innerText = "Чекаємо, поки всі натиснуть 'Готово'";
+        } else {
+             statusText.innerText = "Всі готові! Запускаємо гру...";
+        }
+    }
 });
 
 btnReady.addEventListener('click', () => {
     socket.emit('player_ready');
     btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
-    btnReady.classList.add('is-waiting');
+    btnReady.style.backgroundColor = "#718096"; // Робимо кнопку сірою ТІЛЬКИ ПІСЛЯ натискання
     btnReady.disabled = true;
 });
 
 socket.on('game_already_started', () => {
-    lobbyView.innerHTML = "<h2 class='game-started-title'>Гра вже почалася!</h2><p>Ви не можете приєднатися зараз.</p>";
+    lobbyView.innerHTML = "<div class='panel lobby-panel'><h2 class='text-blue'>Гра вже почалася!</h2><p class='text-gray'>Ви не можете приєднатися зараз.</p></div>";
 });
 
 // ================== СТАРТ ГРИ ==================

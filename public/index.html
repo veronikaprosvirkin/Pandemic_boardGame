@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Пандемія Web</title>
     <link rel="stylesheet" href="style.css">
 </head>
@@ -9,7 +10,7 @@
     <div id="lobby-view" class="flex-center">
         <div class="panel lobby-panel">
             <h2 class="text-blue">Зала очікування</h2>
-            <p class="text-gray">Очікуємо гравців...</p>
+            <p id="lobby-status" class="text-gray">Очікуємо гравців... (мінімум 2)</p>
             <ul id="lobby-players" class="lobby-list"></ul>
             <button id="btn-ready" class="btn-ready">
                 Я ГОТОВИЙ
@@ -17,7 +18,7 @@
         </div>
     </div>
 
-    <div id="game-view" style="display: none; width: 100%; height: 100vh;">
+    <div id="game-view" class="is-hidden game-view">
         <div id="game-container">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
         </div>
@@ -31,7 +32,7 @@
                 <p><strong>Дій:</strong> <span id="my-actions" class="text-orange actions-text">-</span></p>
                 
                 <div id="action-menu" class="cards-section">
-                    <button id="btn-treat" class="action-button" style="display: none;">
+                    <button id="btn-treat" class="action-button is-hidden">
                         💊 Лікувати хворобу
                     </button>
                 </div>
@@ -39,7 +40,7 @@
 
             <div class="panel global-stats-panel">
                 <h3 id="turn-indicator" class="global-stats-title">Очікування...</h3>
-                <button id="end-turn-btn" class="action-button end-turn-btn" style="display: none;">Завершити хід</button>
+                <button id="end-turn-btn" class="action-button end-turn-btn is-hidden">Завершити хід</button>
                 
                 <div class="cards-section">
                     <p class="bottom-cards-title"><strong>Ваші карти міст:</strong></p>
