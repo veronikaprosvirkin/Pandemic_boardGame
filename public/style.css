@@ -9,6 +9,79 @@ body {
     overflow: hidden; /* Ховаємо смуги прокрутки */
 }
 
+.is-hidden {
+    display: none !important;
+}
+
+#lobby-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    width: 100%;
+}
+
+.lobby-panel {
+    width: 400px;
+    text-align: center;
+}
+
+.lobby-title {
+    color: #63b3ed;
+}
+
+.lobby-subtitle {
+    color: #a0aec0;
+}
+
+#lobby-players {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0;
+    text-align: left;
+}
+
+.lobby-player-item {
+    padding: 10px;
+    border-bottom: 1px solid #4a5568;
+}
+
+.lobby-player-ready {
+    color: #48bb78;
+}
+
+.lobby-player-waiting {
+    color: #e2e8f0;
+}
+
+.btn-ready {
+    width: 100%;
+    padding: 15px;
+    background-color: #48bb78;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1.1em;
+    transition: 0.2s;
+}
+
+.btn-ready.is-waiting {
+    background-color: #718096;
+}
+
+#game-view {
+    width: 100%;
+    height: 100vh;
+}
+
+.game-view-active {
+    display: flex;
+    flex-direction: row;
+}
+
 /* Контейнер для самої мапи */
 #game-container {
     flex-grow: 1; /* Мапа займає весь вільний простір зліва */
@@ -64,6 +137,41 @@ p {
     margin-bottom: 10px;
 }
 
+.turn-indicator-active {
+    color: #48bb78;
+}
+
+.turn-indicator-waiting {
+    color: #f56565;
+}
+
+.actions-active {
+    color: #48bb78;
+}
+
+.actions-waiting {
+    color: #a0aec0;
+}
+
+.my-role {
+    color: #4299e1;
+}
+
+.my-role-desc {
+    font-size: 0.85em;
+    color: #a0aec0;
+    margin-top: -10px;
+    margin-bottom: 15px;
+    font-style: italic;
+    line-height: 1.3;
+}
+
+.my-actions {
+    color: #ed8936;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
 /* =========================================
    КНОПКИ ДІЙ
    ========================================= */
@@ -105,6 +213,20 @@ p {
     padding-top: 10px;
 }
 
+.cards-section-spaced {
+    margin-top: 15px;
+}
+
+.cards-label {
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #a0aec0;
+}
+
+.game-started-title {
+    color: #e53e3e;
+}
+
 #my-cards-container {
     display: flex; 
     flex-wrap: wrap; 
@@ -141,6 +263,7 @@ p {
 }
 
 .toast-message {
+    background: var(--toast-bg, #3182ce);
     color: white;
     padding: 10px 15px;
     border-radius: 5px;

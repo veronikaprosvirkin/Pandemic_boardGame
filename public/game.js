@@ -43,9 +43,7 @@ socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
     Object.values(players).forEach(p => {
         const li = document.createElement('li');
-        li.style.padding = "10px";
-        li.style.borderBottom = "1px solid #4a5568";
-        li.style.color = p.isReady ? "#48bb78" : "#e2e8f0";
+        li.className = `lobby-player-item ${p.isReady ? 'lobby-player-ready' : 'lobby-player-waiting'}`;
         li.innerHTML = `<strong>${p.name}</strong> - ${p.isReady ? 'Готовий ✔️' : 'Обирає...'}`;
         lobbyPlayersList.appendChild(li);
     });
@@ -54,12 +52,12 @@ socket.on('lobby_update', (players) => {
 btnReady.addEventListener('click', () => {
     socket.emit('player_ready');
     btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
-    btnReady.style.backgroundColor = "#718096";
+    btnReady.classList.add('is-waiting');
     btnReady.disabled = true;
 });
 
 socket.on('game_already_started', () => {
-    lobbyView.innerHTML = "<h2 style='color:#e53e3e;'>Гра вже почалася!</h2><p>Ви не можете приєднатися зараз.</p>";
+    lobbyView.innerHTML = "<h2 class='game-started-title'>Гра вже почалася!</h2><p>Ви не можете приєднатися зараз.</p>";
 });
 
 // ================== СТАРТ ГРИ ==================
@@ -68,9 +66,9 @@ socket.on('game_started', (data) => {
     mapData = data.cities;
     currentGameState = data.gameState;
     
-    lobbyView.style.display = 'none';
-    gameView.style.display = 'flex';
-    gameView.style.flexDirection = 'row';
+    lobbyView.classList.add('is-hidden');
+    gameView.classList.remove('is-hidden');
+    gameView.classList.add('game-view-active');
 
     updateUI();
     draw(); 
@@ -108,26 +106,30 @@ function updateUI() {
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
-            turnIndicator.style.color = "#48bb78";
+            turnIndicator.classList.remove('turn-indicator-waiting');
+            turnIndicator.classList.add('turn-indicator-active');
             actionsSpan.innerText = currentGameState.actionsLeft;
-            actionsSpan.style.color = "#48bb78";
-            endTurnBtn.style.display = "block";
+            actionsSpan.classList.remove('actions-waiting');
+            actionsSpan.classList.add('actions-active');
+            endTurnBtn.classList.remove('is-hidden');
 
             // Показуємо кнопку лікування, якщо в місті є хвороба
             if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
-                btnTreat.style.display = "block";
+                btnTreat.classList.remove('is-hidden');
                 btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
             } else {
-                btnTreat.style.display = "none";
+                btnTreat.classList.add('is-hidden');
             }
 
         } else {
             if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
-            turnIndicator.style.color = "#f56565";
+            turnIndicator.classList.remove('turn-indicator-active');
+            turnIndicator.classList.add('turn-indicator-waiting');
             actionsSpan.innerText = "Очікування...";
-            actionsSpan.style.color = "#a0aec0";
-            endTurnBtn.style.display = "none";
-            btnTreat.style.display = "none";
+            actionsSpan.classList.remove('actions-active');
+            actionsSpan.classList.add('actions-waiting');
+            endTurnBtn.classList.add('is-hidden');
+            btnTreat.classList.add('is-hidden');
         }
     }
 }
@@ -353,40 +355,24 @@ function showNotification(message, bgColor = "#3182ce") {
     if (!container) {
         container = document.createElement('div');
         container.id = 'notifications-container';
-        container.style.position = 'fixed';
-        container.style.bottom = '20px';
-        container.style.left = '20px'; // Зліва в кутку
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.gap = '10px';
-        container.style.zIndex = '1000';
         document.body.appendChild(container);
     }
 
     const toast = document.createElement('div');
     toast.innerText = message;
-    toast.style.background = bgColor;
-    toast.style.color = "white";
-    toast.style.padding = "10px 15px";
-    toast.style.borderRadius = "5px";
-    toast.style.boxShadow = "0 4px 6px rgba(0,0,0,0.3)";
-    toast.style.fontWeight = "bold";
-    toast.style.opacity = "0";
-    toast.style.transform = "translateX(-20px)";
-    toast.style.transition = "all 0.3s ease";
+    toast.className = 'toast-message';
+    toast.style.setProperty('--toast-bg', bgColor);
 
     container.appendChild(toast);
 
     // Анімація появи
     setTimeout(() => {
-        toast.style.opacity = "1";
-        toast.style.transform = "translateX(0)";
+        toast.classList.add('show');
     }, 10);
 
     // Зникнення через 3.5 секунди
     setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translateX(-20px)";
+        toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
@@ -397,4 +383,9 @@ socket.on('cards_drawn', (cards) => {
         const cityColor = mapData[card] ? mapData[card].color : "#4a5568";
         showNotification(`Взято карту: ${card}`, cityColor);
     });
+});
+
+// Сповіщення для ВСІХ гравців про Епідемію
+socket.on('epidemic_alert', (city) => {
+    showNotification(`⚠️ ЕПІДЕМІЯ В МІСТІ ${city}!`, "#e53e3e"); 
 });

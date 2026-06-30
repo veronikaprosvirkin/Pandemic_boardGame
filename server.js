@@ -17,14 +17,15 @@ let gameState = {
     turnOrder: [],
     currentTurnIndex: 0,
     actionsLeft: 4,
-    infectionRate: 2,
+    infectionRateIndex: 0, // Індекс для масиву швидкості
+    infectionRate: 2,      // Сама швидкість
     outbreaks: 0,
     infections: {} 
 };
 
 let infectionDeck = [];
 let infectionDiscard = [];
-let playerDeck = [];
+let playerDeck = []; 
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
 
@@ -66,16 +67,19 @@ io.on('connection', (socket) => {
             gameState.currentTurnIndex = 0;
             gameState.actionsLeft = 4;
             gameState.outbreaks = 0;
+            gameState.infectionRateIndex = 0;
+            gameState.infectionRate = 2;
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
                 const roleIndex = Math.floor(Math.random() * availableRoles.length);
                 p.role = availableRoles.splice(roleIndex, 1)[0];
                 p.city = "Atlanta"; 
+                p.cards = [];
                 gameState.turnOrder.push(p.id); 
             });
 
-            // Ініціалізація інфекцій
+            // 1. Ініціалізація інфекцій
             gameState.infections = {};
             infectionDeck = Object.keys(cities);
             infectionDiscard = [];
@@ -97,27 +101,43 @@ io.on('connection', (socket) => {
             infectCities(3, 2);
             infectCities(3, 1);
 
-            playerDeck = Object.keys(cities); // Поки що це просто всі міста
-            
-            // Тасуємо колоду гравців
-            for (let i = playerDeck.length - 1; i > 0; i--) {
+            // 2. Ініціалізація колоди гравців та ЕПІДЕМІЙ
+            let initialPlayerDeck = Object.keys(cities); 
+            for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [playerDeck[i], playerDeck[j]] = [playerDeck[j], playerDeck[i]];
+                [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
             }
 
-            // Роздаємо кожному гравцю по 2 стартові карти
+            // Роздаємо стартові карти (без епідемій)
             playersArr.forEach(p => {
-                p.cards = [];
                 for(let i = 0; i < 2; i++) {
-                    if(playerDeck.length > 0) p.cards.push(playerDeck.pop());
+                    if(initialPlayerDeck.length > 0) p.cards.push(initialPlayerDeck.pop());
                 }
             });
+
+            // Ділимо залишок колоди на 4 стопки
+            const numEpidemics = 4;
+            const piles = Array.from({ length: numEpidemics }, () => []);
+            initialPlayerDeck.forEach((card, index) => {
+                piles[index % numEpidemics].push(card);
+            });
+
+            // Додаємо в кожну стопку 1 Епідемію, тасуємо і збираємо фінальну колоду
+            playerDeck = [];
+            for (let i = piles.length - 1; i >= 0; i--) {
+                let pile = piles[i];
+                pile.push("ЕПІДЕМІЯ");
+                for (let k = pile.length - 1; k > 0; k--) {
+                    const j = Math.floor(Math.random() * (k + 1));
+                    [pile[k], pile[j]] = [pile[j], pile[k]];
+                }
+                playerDeck = playerDeck.concat(pile); // Кладемо стопку наверх
+            }
 
             io.emit('game_started', { cities, gameState });
         }
     }
 
-    // РУХ ГРАВЦЯ
     socket.on('move_player', (targetCity) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
@@ -133,7 +153,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ДІЯ: ЛІКУВАННЯ
     socket.on('treat_disease', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
@@ -143,11 +162,9 @@ io.on('connection', (socket) => {
         const city = player.city;
 
         if (gameState.infections[city] && gameState.infections[city] > 0) {
-            // Медик лікує все
             if (player.role === "Медик") {
                 gameState.infections[city] = 0;
             } else {
-                // Інші по 1 кубику
                 gameState.infections[city] -= 1;
             }
             gameState.actionsLeft--;
@@ -155,43 +172,91 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ЗАВЕРШЕННЯ ХОДУ (ФАЗА ІНФЕКЦІЇ)
     socket.on('end_turn', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
-            
-        const player = gameState.players[socket.id];
-            const drawnCards = []; // Масив для повідомлення
+
+            // --- 1. ГРАВЕЦЬ ТЯГНЕ КАРТИ ---
+            const player = gameState.players[socket.id];
+            const drawnCards = [];
+            let epidemicsDrawn = 0;
+
             for(let i = 0; i < 2; i++) {
                 if (playerDeck.length > 0) {
                     const card = playerDeck.pop();
-                    player.cards.push(card);
-                    drawnCards.push(card);
+                    if (card === "ЕПІДЕМІЯ") {
+                        epidemicsDrawn++;
+                    } else {
+                        player.cards.push(card);
+                        drawnCards.push(card);
+                    }
+                } else {
+                    console.log("💀 ПРОГРАШ: Колода гравців закінчилася!");
                 }
             }
-            
-            io.to(socket.id).emit('cards_drawn', drawnCards);
+            if (drawnCards.length > 0) io.to(socket.id).emit('cards_drawn', drawnCards);
 
-            // Інфекція поширюється
+            // --- ОБРОБКА ЕПІДЕМІЙ ---
+            for (let e = 0; e < epidemicsDrawn; e++) {
+                // 1. Підвищення: збільшуємо індекс і визначаємо новий рейт
+                gameState.infectionRateIndex++;
+                const rates = [2, 2, 2, 3, 3, 4, 4];
+                gameState.infectionRate = rates[Math.min(gameState.infectionRateIndex, rates.length - 1)];
+
+                // 2. Епідемія: тягнемо з САМОГО НИЗУ (shift)
+                if (infectionDeck.length > 0) {
+                    const bottomCity = infectionDeck.shift(); 
+                    infectionDiscard.push(bottomCity);
+                    
+                    if (gameState.infections[bottomCity] === undefined) {
+                        gameState.infections[bottomCity] = 0;
+                    }
+                    
+                    gameState.infections[bottomCity] += 3;
+                    if (gameState.infections[bottomCity] > 3) {
+                        gameState.outbreaks++; // Спалах!
+                        gameState.infections[bottomCity] = 3;
+                    }
+                    
+                    // Відправляємо всім червоне сповіщення
+                    io.emit('epidemic_alert', bottomCity);
+                }
+
+                // 3. Загострення: тасуємо скид і кладемо ЗВЕРХУ (додаємо в кінець масиву)
+                for (let i = infectionDiscard.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [infectionDiscard[i], infectionDiscard[j]] = [infectionDiscard[j], infectionDiscard[i]];
+                }
+                infectionDeck = infectionDeck.concat(infectionDiscard); 
+                infectionDiscard = []; // Скид порожній
+            }
+
+            // --- 2. ФАЗА ІНФЕКЦІЇ ---
+            const infectedCitiesThisTurn = []; // Масив для сповіщень про інфекцію
+            
             for (let i = 0; i < gameState.infectionRate; i++) {
                 if (infectionDeck.length > 0) {
                     const infectedCity = infectionDeck.pop();
                     infectionDiscard.push(infectedCity);
+                    infectedCitiesThisTurn.push(infectedCity); // Додаємо місто в список
 
                     if (gameState.infections[infectedCity] === undefined) {
                         gameState.infections[infectedCity] = 0;
                     }
 
                     if (gameState.infections[infectedCity] >= 3) {
-                        gameState.outbreaks++; // Спалах!
+                        gameState.outbreaks++; 
                         console.log(`💥 СПАЛАХ у місті ${infectedCity}!`);
                     } else {
-                        gameState.infections[infectedCity]++; // +1 кубик
+                        gameState.infections[infectedCity]++; 
                     }
                 }
             }
 
-            // Передача ходу
+            // Сповіщаємо всіх гравців про нові інфекції
+            io.emit('infection_drawn', infectedCitiesThisTurn);
+
+            // --- 3. ПЕРЕДАЧА ХОДУ ---
             gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
             gameState.actionsLeft = 4;
             io.emit('state_update', gameState);
@@ -199,6 +264,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        // ... (Тут залишається твоя стара логіка disconnect)
         console.log(`Гравець відключився: ${socket.id}`);
         if (gameState.status === 'LOBBY') {
             delete gameState.players[socket.id];

@@ -2,24 +2,25 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Пандемія Web</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="lobby-view" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100%;">
-        <div class="panel" style="width: 400px; text-align: center;">
-            <h2 style="color: #63b3ed;">Зала очікування</h2>
-            <p style="color: #a0aec0;">Очікуємо гравців...</p>
+    <div id="lobby-view" class="lobby-view">
+        <div class="panel lobby-panel">
+            <h2 class="lobby-title">Зала очікування</h2>
+            <p class="lobby-subtitle">Очікуємо гравців...</p>
             
-            <ul id="lobby-players" style="list-style: none; padding: 0; margin: 20px 0; text-align: left;"></ul>
+            <ul id="lobby-players"></ul>
 
-            <button id="btn-ready" style="width: 100%; padding: 15px; background-color: #48bb78; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.1em; transition: 0.2s;">
+            <button id="btn-ready" class="btn-ready">
                 Я ГОТОВИЙ
             </button>
         </div>
     </div>
 
-    <div id="game-view" style="display: none; width: 100%; height: 100vh;">
+    <div id="game-view" class="game-view is-hidden">
         <div id="game-container">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
         </div>
@@ -27,28 +28,28 @@
         <div id="ui-panel">
             <div class="panel">
                 <h2>Ваш статус</h2>
-                <p><strong>Роль:</strong> <span id="my-role" style="color: #4299e1;"></span></p>
-                <p id="my-role-desc" style="font-size: 0.85em; color: #a0aec0; margin-top: -10px; margin-bottom: 15px; font-style: italic; line-height: 1.3;"></p>
+                <p><strong>Роль:</strong> <span id="my-role" class="my-role"></span></p>
+                <p id="my-role-desc" class="my-role-desc"></p>
                 <p><strong>Місто:</strong> <span id="my-city"></span></p>
-                <p><strong>Дій:</strong> <span id="my-actions" style="color: #ed8936; font-size: 1.2em; font-weight: bold;">-</span></p>
+                <p><strong>Дій:</strong> <span id="my-actions" class="my-actions">-</span></p>
                 
                 <div id="action-menu" class="cards-section">
-                    <button id="btn-treat" class="action-button" style="display: none;">
+                    <button id="btn-treat" class="action-button is-hidden">
                         💊 Лікувати хворобу
                     </button>
-                </div>
-
-                <div class="cards-section">
-                    <p style="margin-bottom: 5px;"><strong>Ваші карти:</strong></p>
-                    <div id="my-cards-container">
-                        <span class="no-cards-text">Немає карт</span>
-                    </div>
                 </div>
             </div>
 
             <div class="panel global-stats-panel">
                 <h3 id="turn-indicator" class="global-stats-title">Очікування...</h3>
-                <button id="end-turn-btn" class="action-button" style="display: none;">Завершити хід</button>
+                <button id="end-turn-btn" class="action-button is-hidden">Завершити хід</button>
+                
+                <div class="cards-section cards-section-spaced">
+                    <p class="cards-label">Ваші карти міст:</p>
+                    <div id="my-cards-container">
+                        <span class="no-cards-text">Немає карт</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
