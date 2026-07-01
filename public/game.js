@@ -278,9 +278,45 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // 1. Лінії
+    // === НОВЕ: ВИЗНАЧАЄМО ДОСТУПНІ МІСТА ДЛЯ ПІДСВІЧУВАННЯ ===
+    let reachableCities = [];
+    let myCity = null;
+    const me = currentGameState.players ? currentGameState.players[myPlayerId] : null;
+    const isMyTurn = currentGameState.status === 'PLAYING' && 
+                     currentGameState.turnOrder && 
+                     currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId;
+
+    if (isMyTurn && me) {
+        myCity = me.city;
+        const myCityData = mapData[myCity];
+        
+        // 1. На авто/поромі (сусідні міста)
+        if (myCityData && myCityData.connections) {
+            reachableCities.push(...myCityData.connections); 
+        }
+        
+        if (me.cards) {
+            // 2. Прямий рейс (скидаємо карту куди летимо)
+            reachableCities.push(...me.cards); 
+            // 3. Чартер (скидаємо карту де стоїмо - летимо будь-куди)
+            if (me.cards.includes(myCity)) {
+                reachableCities = Object.keys(mapData); 
+            }
+        }
+        
+        // 4. Службовий рейс (між станціями)
+        const stations = currentGameState.researchStations || [];
+        if (stations.includes(myCity)) {
+            reachableCities.push(...stations);
+        }
+    }
+
+    const time = Date.now();
+    const pulse = (Math.sin(time / 150) + 1) / 2;
+    const slowPulse = (Math.sin(time / 300) + 1) / 2; // Для плавного підсвічування шляхів
+
+    // === 1. ЛІНІЇ ===
     ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
     const drawnLines = new Set();
 
     for (const [cityName, cityData] of Object.entries(mapData)) {
@@ -295,6 +331,11 @@ function draw() {
                 const end = getCoords(target.x, target.y);
                 const dist = Math.hypot(start.x - end.x, start.y - end.y);
 
+                // Перевіряємо, чи це доступний зараз шлях
+                const isReachablePath = isMyTurn && 
+                    ((myCity === cityName && reachableCities.includes(targetName)) || 
+                     (myCity === targetName && reachableCities.includes(cityName)));
+
                 ctx.beginPath();
                 if (dist > canvas.width * 0.7) { 
                     const leftCity = start.x < end.x ? start : end;
@@ -307,79 +348,102 @@ function draw() {
                     ctx.moveTo(start.x, start.y);
                     ctx.lineTo(end.x, end.y);
                 }
+
+                // Підсвічуємо лінію помаранчевим, якщо туди можна піти
+                if (isReachablePath) {
+                    ctx.lineWidth = 5;
+                    ctx.strokeStyle = `rgba(237, 137, 54, ${0.4 + 0.6 * slowPulse})`;
+                } else {
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                }
                 ctx.stroke();
             }
         });
     }
 
-    // 2. Міста
+    // === 2. МІСТА ТА ТЕКСТ ===
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
+        const hasStation = currentGameState.researchStations && currentGameState.researchStations.includes(cityName);
+        const isReachable = isMyTurn && reachableCities.includes(cityName) && cityName !== myCity;
 
+        // Малюємо ореол-підсвічування для доступних міст
+        if (isReachable) {
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, 20 + (4 * slowPulse), 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(237, 137, 54, 0.3)`; 
+            ctx.fill();
+        }
+
+        // Сама крапка міста
         ctx.fillStyle = cityData.color;
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, 12, 0, Math.PI * 2);
+        ctx.arc(pos.x, pos.y, hasStation ? 14 : 12, 0, Math.PI * 2);
         ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "white";
+        
+        if (hasStation) {
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#00ffff"; 
+            ctx.shadowColor = "#00ffff";
+            ctx.shadowBlur = 15; 
+        } else {
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "white";
+            ctx.shadowBlur = 0;
+        }
         ctx.stroke();
+        ctx.shadowBlur = 0; 
         
-        ctx.fillStyle = "white";
-        ctx.font = "bold 14px Arial";
-        const textWidth = ctx.measureText(cityName).width;
+        // ТЕКСТ: Піднімаємо вгору і робимо жорстку обводку замість "мильної" тіні
+        ctx.fillStyle = "white"; 
+        ctx.font = hasStation ? "bold 16px Arial" : "bold 14px Arial"; 
         
-        ctx.shadowColor = "black";
-        ctx.shadowBlur = 4;
-        ctx.fillText(cityName, pos.x - (textWidth / 2), pos.y + 28);
-        ctx.shadowBlur = 0;
-    }
-    // 2.5. Дослідні станції (Білі будиночки)
-    if (currentGameState.researchStations) {
-        currentGameState.researchStations.forEach(stationCity => {
-            if (mapData[stationCity]) {
-                const pos = getCoords(mapData[stationCity].x, mapData[stationCity].y);
-                ctx.fillStyle = "white";
-                // Малюємо "будиночок"
-                ctx.beginPath();
-                ctx.moveTo(pos.x - 10, pos.y - 12);
-                ctx.lineTo(pos.x + 10, pos.y - 12);
-                ctx.lineTo(pos.x, pos.y - 24); // Дах
-                ctx.fill();
-                ctx.fillRect(pos.x - 7, pos.y - 12, 14, 10); // Основа
-                
-                ctx.strokeStyle = "black";
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        });
+        const textToDraw = hasStation ? `🔬 ${cityName}` : cityName;
+        const textWidth = ctx.measureText(textToDraw).width;
+        
+        const textX = pos.x - (textWidth / 2);
+        const textY = pos.y - 20; // ПІДНЯЛИ ТЕКСТ НАД МІСТОМ
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "black";
+        ctx.strokeText(textToDraw, textX, textY); // Чорна обводка
+        ctx.fillText(textToDraw, textX, textY);   // Білий текст
     }
 
-    // 3. Кубики інфекцій (Над містом)
+    // === 3. КУБИКИ ІНФЕКЦІЙ (Під містом) ===
     if (currentGameState.infections) {
         for (const [cityName, count] of Object.entries(currentGameState.infections)) {
             if (count > 0 && mapData[cityName]) {
                 const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
                 const cubeColor = mapData[cityName].color;
 
+                const cubeSize = 12;
+                const padding = 2;
+                const totalWidth = (count * cubeSize) + ((count - 1) * padding);
+                
+                // Центруємо кубики під містом
+                const startX = pos.x - (totalWidth / 2);
+                const cy = pos.y + 16; // ОПУСТИЛИ КУБИКИ ПІД МІСТО
+
                 for (let i = 0; i < count; i++) {
-                    ctx.fillStyle = cubeColor;
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
-                    ctx.lineWidth = 2;
+                    const cx = startX + (i * (cubeSize + padding));
                     
-                    const cx = pos.x - 18 + (i * 14);
-                    const cy = pos.y - 30;
-                    
-                    ctx.shadowColor = "rgba(0, 0, 0, 0.7)";
-                    ctx.shadowBlur = 4;
-                    ctx.shadowOffsetX = 2;
-                    ctx.shadowOffsetY = 2;
-
-                    ctx.fillRect(cx, cy, 12, 12);
-                    ctx.strokeRect(cx, cy, 12, 12);
-
-                    ctx.shadowBlur = 0;
+                    ctx.shadowColor = cubeColor === "#000000" ? "#a0aec0" : cubeColor; 
+                    ctx.shadowBlur = 4 + (10 * pulse); 
                     ctx.shadowOffsetX = 0;
                     ctx.shadowOffsetY = 0;
+
+                    ctx.globalAlpha = 0.7 + (0.3 * pulse); 
+                    ctx.fillStyle = cubeColor;
+                    ctx.fillRect(cx, cy, cubeSize, cubeSize);
+                    
+                    ctx.globalAlpha = 1.0; 
+                    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(cx, cy, cubeSize, cubeSize);
+
+                    ctx.shadowBlur = 0; 
                 }
             }
         }
