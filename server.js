@@ -27,7 +27,7 @@ let infectionDeck = [];
 let infectionDiscard = [];
 let playerDeck = []; 
 
-const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину"];
+const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину", "Інженер"];
 
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
@@ -70,6 +70,7 @@ io.on('connection', (socket) => {
             gameState.infectionRateIndex = 0;
             gameState.infectionRate = 2;
             gameState.researchStations = ["Atlanta"];
+            gameState.cured = {};
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
@@ -281,18 +282,77 @@ io.on('connection', (socket) => {
     });
 
     // БУДІВНИЦТВО СТАНЦІЇ
+    // БУДІВНИЦТВО СТАНЦІЇ
     socket.on('build_station', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
 
         const player = gameState.players[socket.id];
-        // Перевіряємо чи є карта міста і чи немає там вже станції
-        if (player.cards.includes(player.city) && !gameState.researchStations.includes(player.city)) {
-            player.cards.splice(player.cards.indexOf(player.city), 1); // Витрачаємо карту
-            gameState.researchStations.push(player.city);
-            gameState.actionsLeft--;
-            io.emit('state_update', gameState);
+        
+        if (!gameState.researchStations.includes(player.city)) {
+            // ЖОРСТКИЙ ЛІМІТ: Якщо 6 станцій вже є, блокуємо і кидаємо помилку
+            if (gameState.researchStations.length >= 6) {
+                socket.emit('max_stations_reached'); 
+                return; // Зупиняємо виконання, карту не витрачаємо!
+            }
+
+            let canBuild = false;
+            
+            if (player.role === "Інженер") {
+                canBuild = true;
+            } else if (player.cards.includes(player.city)) {
+                player.cards.splice(player.cards.indexOf(player.city), 1); // Витрачаємо карту
+                canBuild = true;
+            }
+
+            if (canBuild) {
+                gameState.researchStations.push(player.city);
+                gameState.actionsLeft--;
+                io.emit('state_update', gameState);
+            }
+        }
+    });
+
+    // ВИНАЙДЕННЯ ЛІКІВ (ВАКЦИНИ)
+    socket.on('discover_cure', () => {
+        if (gameState.status !== 'PLAYING') return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (gameState.actionsLeft <= 0) return;
+
+        const player = gameState.players[socket.id];
+        
+        // 1. Гравець ПОВИНЕН стояти на Дослідній станції
+        if (!gameState.researchStations.includes(player.city)) return;
+
+        // 2. Рахуємо карти в руці за кольором
+        const needed = player.role === "Вчений" ? 4 : 5; // Вченому треба лише 4!
+        const cardsByColor = {};
+        
+        player.cards.forEach(city => {
+            const color = cities[city].color;
+            if (!cardsByColor[color]) cardsByColor[color] = [];
+            cardsByColor[color].push(city);
+        });
+
+        if (!gameState.cured) gameState.cured = {};
+
+        // 3. Шукаємо колір, якого вистачає і який ще не вилікуваний
+        for (const [color, cityCards] of Object.entries(cardsByColor)) {
+            if (cityCards.length >= needed && !gameState.cured[color]) {
+                // Ліки знайдено!
+                gameState.cured[color] = true;
+                
+                for (let i = 0; i < needed; i++) {
+                    const cardToRemove = cityCards[i];
+                    player.cards.splice(player.cards.indexOf(cardToRemove), 1);
+                }
+
+                gameState.actionsLeft--;
+                io.emit('state_update', gameState);
+                io.emit('cure_discovered', color); // Сповіщаємо всіх про успіх
+                return;
+            }
         }
     });
 

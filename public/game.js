@@ -35,7 +35,8 @@ const roleDescriptions = {
     "Вчений": "🔬 Для винайдення ліків потрібно лише 4 карти.",
     "Диспетчер": "🚁 Може рухати чужі фішки як свої.",
     "Дослідник": "📑 Може віддавати карти іншим гравцям.",
-    "Фахівець із карантину": "🛑 Запобігає поширенню хвороб."
+    "Фахівець із карантину": "🛑 Запобігає поширенню хвороб.",
+    "Інженер": "🛠️ Може будувати дослідну станцію у місті без карти."
 };
 
 // ================== ЛОБІ ==================
@@ -103,7 +104,17 @@ socket.on('state_update', (newState) => {
 });
 
 // ================== ІНТЕРФЕЙС (UI) ==================
-//ВІДМАЛЬОВКА КАРТ ГРАВЦЯ
+function updateUI() {
+    if (!currentGameState.players || !currentGameState.players[myPlayerId]) return;
+    
+    const me = currentGameState.players[myPlayerId];
+    document.getElementById('my-role').innerText = me.role;
+    document.getElementById('my-city').innerText = me.city;
+
+    const descEl = document.getElementById('my-role-desc');
+    if (descEl) descEl.innerText = roleDescriptions[me.role];
+
+    // ВІДМАЛЬОВКА КАРТ ГРАВЦЯ
     const isOverLimit = me.cards && me.cards.length > 7;
     const cardsContainer = document.getElementById('my-cards-container');
     if (cardsContainer) {
@@ -145,6 +156,9 @@ socket.on('state_update', (newState) => {
         const actionsSpan = document.getElementById('my-actions');
         const btnTreat = document.getElementById('btn-treat');
         const btnBuild = document.getElementById('btn-build');
+        
+        // Знаходимо кнопку вакцини
+        const btnCure = document.getElementById('btn-cure'); 
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
@@ -157,6 +171,7 @@ socket.on('state_update', (newState) => {
                 endTurnBtn.classList.add('is-hidden');
                 if (btnTreat) btnTreat.style.display = "none";
                 if (btnBuild) btnBuild.style.display = "none";
+                if (btnCure) btnCure.style.display = "none"; // Ховаємо кнопку вакцини
             } else {
                 actionsSpan.innerText = currentGameState.actionsLeft;
                 actionsSpan.style.color = "#ed8936";
@@ -168,18 +183,57 @@ socket.on('state_update', (newState) => {
                 } else {
                     btnTreat.style.display = "none";
                 }
-
-                // Кнопка будівництва (якщо є карта міста і там ще немає станції)
+                
+                // Кнопка будівництва
                 if (btnBuild) {
-                    if (me.cards.includes(me.city) && (!currentGameState.researchStations || !currentGameState.researchStations.includes(me.city))) {
+                    const hasStationHere = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
+                    const canBuild = !hasStationHere && (me.role === "Інженер" || me.cards.includes(me.city));
+                    
+                    if (canBuild) {
                         btnBuild.style.display = "block";
+                        btnBuild.innerText = me.role === "Інженер" ? "🛠️ Побудувати станцію (Безкоштовно)" : "🏗️ Побудувати станцію (Скинути карту)";
                     } else {
                         btnBuild.style.display = "none";
                     }
                 }
+
+                // === НОВЕ: ЛОГІКА КНОПКИ ВАКЦИНИ ===
+                if (btnCure) {
+                    // Перевіряємо, чи стоїть гравець на станції
+                    const atStation = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
+                    const neededCureCards = me.role === "Вчений" ? 4 : 5;
+                    let canCure = false;
+                    
+                    if (atStation && me.cards) {
+                        const colorsCount = {};
+                        me.cards.forEach(c => {
+                            if (mapData[c]) {
+                                const col = mapData[c].color;
+                                colorsCount[col] = (colorsCount[col] || 0) + 1;
+                            }
+                        });
+                        
+                        if (!currentGameState.cured) currentGameState.cured = {};
+                        
+                        for (const [col, count] of Object.entries(colorsCount)) {
+                            // Якщо карт вистачає і цей колір ще НЕ вилікуваний
+                            if (count >= neededCureCards && !currentGameState.cured[col]) {
+                                canCure = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Показуємо або ховаємо кнопку
+                    if (canCure) {
+                        btnCure.style.display = "block";
+                        btnCure.innerText = me.role === "Вчений" ? "🧪 Винайти ліки (4 карти)" : "🧪 Винайти ліки (5 карт)";
+                    } else {
+                        btnCure.style.display = "none";
+                    }
+                }
             }
         } else {
-            // ... (тут залишається твій код else для очікування)
             if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             turnIndicator.classList.remove('turn-indicator-active');
             turnIndicator.classList.add('turn-indicator-waiting');
@@ -188,8 +242,29 @@ socket.on('state_update', (newState) => {
             endTurnBtn.classList.add('is-hidden');
             if(btnTreat) btnTreat.style.display = "none";
             if(btnBuild) btnBuild.style.display = "none";
+            if(btnCure) btnCure.style.display = "none"; // Ховаємо кнопку вакцини
         }
     }
+
+    // === НОВЕ: ВІДМАЛЬОВКА ВИЛІКУВАНИХ ХВОРОБ (КОЛБИ) ===
+    const curesContainer = document.getElementById('cures-container');
+    if (curesContainer) {
+        curesContainer.innerHTML = '';
+        if (currentGameState.cured && Object.keys(currentGameState.cured).length > 0) {
+            Object.entries(currentGameState.cured).forEach(([color, isCured]) => {
+                if (isCured) {
+                    const flask = document.createElement('div');
+                    flask.innerText = "🧪";
+                    flask.className = "cure-flask"; 
+                    flask.style.backgroundColor = color;
+                    curesContainer.appendChild(flask);
+                }
+            });
+        } else {
+            curesContainer.innerHTML = '<span class="no-cards-text">Поки немає</span>';
+        }
+    }
+}
 
 // ================== ВІДМАЛЬОВКА (CANVAS) ==================
 function draw() {
@@ -400,6 +475,23 @@ if (btnTreat) {
         socket.emit('treat_disease');
     });
 }
+
+const btnCure = document.getElementById('btn-cure');
+if (btnCure) {
+    btnCure.addEventListener('click', () => {
+        socket.emit('discover_cure');
+    });
+}
+
+// Сповіщення про ліміт станцій
+socket.on('max_stations_reached', () => {
+    showNotification(`❌ Досягнуто ліміт! На карті вже є 6 станцій.`, 'epidemic');
+});
+
+// Сповіщення про винайдення
+socket.on('cure_discovered', (color) => {
+    showNotification(`🧪 ВИНАЙДЕНО ЛІКИ!`, 'card', color);
+});
 
 const btnBuild = document.getElementById('btn-build');
 if (btnBuild) {
