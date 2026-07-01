@@ -169,37 +169,37 @@ function updateUI() {
                 actionsSpan.innerText = "СКИНЬТЕ КАРТИ (натисніть на них)";
                 actionsSpan.style.color = "#e53e3e";
                 endTurnBtn.classList.add('is-hidden');
-                if (btnTreat) btnTreat.style.display = "none";
-                if (btnBuild) btnBuild.style.display = "none";
-                if (btnCure) btnCure.style.display = "none"; // Ховаємо кнопку вакцини
+                if (btnTreat) btnTreat.classList.add('is-hidden');
+                if (btnBuild) btnBuild.classList.add('is-hidden');
+                if (btnCure) btnCure.classList.add('is-hidden'); 
             } else {
                 actionsSpan.innerText = currentGameState.actionsLeft;
                 actionsSpan.style.color = "#ed8936";
                 endTurnBtn.classList.remove('is-hidden');
 
+                // 1. КНОПКА ЛІКУВАННЯ
                 if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
-                    btnTreat.style.display = "block";
+                    btnTreat.classList.remove('is-hidden');
                     btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
                 } else {
-                    btnTreat.style.display = "none";
+                    btnTreat.classList.add('is-hidden');
                 }
                 
-                // Кнопка будівництва
+                // 2. КНОПКА БУДІВНИЦТВА
                 if (btnBuild) {
                     const hasStationHere = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
                     const canBuild = !hasStationHere && (me.role === "Інженер" || me.cards.includes(me.city));
                     
                     if (canBuild) {
-                        btnBuild.style.display = "block";
+                        btnBuild.classList.remove('is-hidden');
                         btnBuild.innerText = me.role === "Інженер" ? "🛠️ Побудувати станцію (Безкоштовно)" : "🏗️ Побудувати станцію (Скинути карту)";
                     } else {
-                        btnBuild.style.display = "none";
+                        btnBuild.classList.add('is-hidden');
                     }
                 }
 
-                // === НОВЕ: ЛОГІКА КНОПКИ ВАКЦИНИ ===
+                // 3. КНОПКА ВАКЦИНИ
                 if (btnCure) {
-                    // Перевіряємо, чи стоїть гравець на станції
                     const atStation = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
                     const neededCureCards = me.role === "Вчений" ? 4 : 5;
                     let canCure = false;
@@ -224,12 +224,11 @@ function updateUI() {
                         }
                     }
                     
-                    // Показуємо або ховаємо кнопку
                     if (canCure) {
-                        btnCure.style.display = "block";
+                        btnCure.classList.remove('is-hidden');
                         btnCure.innerText = me.role === "Вчений" ? "🧪 Винайти ліки (4 карти)" : "🧪 Винайти ліки (5 карт)";
                     } else {
-                        btnCure.style.display = "none";
+                        btnCure.classList.add('is-hidden');
                     }
                 }
             }
@@ -239,10 +238,12 @@ function updateUI() {
             turnIndicator.classList.add('turn-indicator-waiting');
             actionsSpan.innerText = "Очікування...";
             actionsSpan.style.color = "#a0aec0";
+            
+            // Ховаємо всі кнопки, коли не наш хід
             endTurnBtn.classList.add('is-hidden');
-            if(btnTreat) btnTreat.style.display = "none";
-            if(btnBuild) btnBuild.style.display = "none";
-            if(btnCure) btnCure.style.display = "none"; // Ховаємо кнопку вакцини
+            if (btnTreat) btnTreat.classList.add('is-hidden');
+            if (btnBuild) btnBuild.classList.add('is-hidden');
+            if (btnCure) btnCure.classList.add('is-hidden'); 
         }
     }
 
