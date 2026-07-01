@@ -103,15 +103,33 @@ socket.on('state_update', (newState) => {
 });
 
 // ================== ІНТЕРФЕЙС (UI) ==================
-function updateUI() {
-    if (!currentGameState.players || !currentGameState.players[myPlayerId]) return;
-    
-    const me = currentGameState.players[myPlayerId];
-    document.getElementById('my-role').innerText = me.role;
-    document.getElementById('my-city').innerText = me.city;
+//ВІДМАЛЬОВКА КАРТ ГРАВЦЯ
+    const isOverLimit = me.cards && me.cards.length > 7;
+    const cardsContainer = document.getElementById('my-cards-container');
+    if (cardsContainer) {
+        cardsContainer.innerHTML = '';
+        if (me.cards && me.cards.length > 0) {
+            me.cards.forEach(cardCity => {
+                const cardEl = document.createElement('div');
+                const cityColor = mapData[cardCity] ? mapData[cardCity].color : "#718096";
+                
+                cardEl.innerText = cardCity;
+                cardEl.className = 'player-card'; 
+                cardEl.style.backgroundColor = cityColor; 
+                
+                // Якщо карт > 7, робимо їх клікабельними для скидання
+                if (isOverLimit && isMyTurn) {
+                    cardEl.style.cursor = "pointer";
+                    cardEl.style.border = "2px solid #e53e3e"; // Червона рамка-підказка
+                    cardEl.onclick = () => socket.emit('discard_card', cardCity);
+                }
 
-    const descEl = document.getElementById('my-role-desc');
-    if (descEl) descEl.innerText = roleDescriptions[me.role];
+                cardsContainer.appendChild(cardEl);
+            });
+        } else {
+            cardsContainer.innerHTML = '<span class="no-cards-text">Немає карт</span>';
+        }
+    }
 
     if (currentGameState.turnOrder && currentGameState.turnOrder.length > 0) {
         if (currentGameState.currentTurnIndex >= currentGameState.turnOrder.length) {
@@ -126,36 +144,52 @@ function updateUI() {
         const endTurnBtn = document.getElementById('end-turn-btn');
         const actionsSpan = document.getElementById('my-actions');
         const btnTreat = document.getElementById('btn-treat');
+        const btnBuild = document.getElementById('btn-build');
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
             turnIndicator.classList.remove('turn-indicator-waiting');
             turnIndicator.classList.add('turn-indicator-active');
-            actionsSpan.innerText = currentGameState.actionsLeft;
-            actionsSpan.classList.remove('actions-waiting');
-            actionsSpan.classList.add('actions-active');
-            endTurnBtn.classList.remove('is-hidden');
-
-            // Показуємо кнопку лікування, якщо в місті є хвороба
-            if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
-                btnTreat.classList.remove('is-hidden');
-                btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
+            
+            if (isOverLimit) {
+                actionsSpan.innerText = "СКИНЬТЕ КАРТИ (натисніть на них)";
+                actionsSpan.style.color = "#e53e3e";
+                endTurnBtn.classList.add('is-hidden');
+                if (btnTreat) btnTreat.style.display = "none";
+                if (btnBuild) btnBuild.style.display = "none";
             } else {
-                btnTreat.classList.add('is-hidden');
-            }
+                actionsSpan.innerText = currentGameState.actionsLeft;
+                actionsSpan.style.color = "#ed8936";
+                endTurnBtn.classList.remove('is-hidden');
 
+                if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
+                    btnTreat.style.display = "block";
+                    btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
+                } else {
+                    btnTreat.style.display = "none";
+                }
+
+                // Кнопка будівництва (якщо є карта міста і там ще немає станції)
+                if (btnBuild) {
+                    if (me.cards.includes(me.city) && (!currentGameState.researchStations || !currentGameState.researchStations.includes(me.city))) {
+                        btnBuild.style.display = "block";
+                    } else {
+                        btnBuild.style.display = "none";
+                    }
+                }
+            }
         } else {
+            // ... (тут залишається твій код else для очікування)
             if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             turnIndicator.classList.remove('turn-indicator-active');
             turnIndicator.classList.add('turn-indicator-waiting');
             actionsSpan.innerText = "Очікування...";
-            actionsSpan.classList.remove('actions-active');
-            actionsSpan.classList.add('actions-waiting');
+            actionsSpan.style.color = "#a0aec0";
             endTurnBtn.classList.add('is-hidden');
-            btnTreat.classList.add('is-hidden');
+            if(btnTreat) btnTreat.style.display = "none";
+            if(btnBuild) btnBuild.style.display = "none";
         }
     }
-}
 
 // ================== ВІДМАЛЬОВКА (CANVAS) ==================
 function draw() {
@@ -222,6 +256,26 @@ function draw() {
         ctx.shadowBlur = 4;
         ctx.fillText(cityName, pos.x - (textWidth / 2), pos.y + 28);
         ctx.shadowBlur = 0;
+    }
+    // 2.5. Дослідні станції (Білі будиночки)
+    if (currentGameState.researchStations) {
+        currentGameState.researchStations.forEach(stationCity => {
+            if (mapData[stationCity]) {
+                const pos = getCoords(mapData[stationCity].x, mapData[stationCity].y);
+                ctx.fillStyle = "white";
+                // Малюємо "будиночок"
+                ctx.beginPath();
+                ctx.moveTo(pos.x - 10, pos.y - 12);
+                ctx.lineTo(pos.x + 10, pos.y - 12);
+                ctx.lineTo(pos.x, pos.y - 24); // Дах
+                ctx.fill();
+                ctx.fillRect(pos.x - 7, pos.y - 12, 14, 10); // Основа
+                
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        });
     }
 
     // 3. Кубики інфекцій (Над містом)
@@ -347,6 +401,13 @@ if (btnTreat) {
     });
 }
 
+const btnBuild = document.getElementById('btn-build');
+if (btnBuild) {
+    btnBuild.addEventListener('click', () => {
+        socket.emit('build_station');
+    });
+}
+
 // Рух по карті
 canvas.addEventListener('click', (e) => {
     if (currentGameState.status !== 'PLAYING') return;
@@ -354,6 +415,9 @@ canvas.addEventListener('click', (e) => {
     const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
     if (activePlayerId !== myPlayerId) return; 
     if (currentGameState.actionsLeft <= 0) return; 
+    
+    const me = currentGameState.players[myPlayerId];
+    if (me.cards.length > 7) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);

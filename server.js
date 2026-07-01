@@ -69,6 +69,7 @@ io.on('connection', (socket) => {
             gameState.outbreaks = 0;
             gameState.infectionRateIndex = 0;
             gameState.infectionRate = 2;
+            gameState.researchStations = ["Atlanta"];
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
@@ -145,14 +146,33 @@ io.on('connection', (socket) => {
 
         const player = gameState.players[socket.id];
         const currentCity = cities[player.city];
+        if (player.cards.length > 7) return;
 
+        let moved = false;
         if (currentCity && currentCity.connections.includes(targetCity)) {
+            moved = true;
+        }
+        // 2. Прямий рейс (скинути карту міста, КУДИ летиш)
+        else if (player.cards.includes(targetCity)) {
+            player.cards.splice(player.cards.indexOf(targetCity), 1);
+            moved = true;
+        }
+        // 3. Чартерний рейс (скинути карту міста, ДЕ стоїш)
+        else if (player.cards.includes(player.city)) {
+            player.cards.splice(player.cards.indexOf(player.city), 1);
+            moved = true;
+        }
+        // 4. Службовий рейс (між двома станціями)
+        else if (gameState.researchStations.includes(player.city) && gameState.researchStations.includes(targetCity)) {
+            moved = true;
+        }
+
+        if (moved) {
             player.city = targetCity;
             gameState.actionsLeft--;
             io.emit('state_update', gameState); 
         }
     });
-
     socket.on('treat_disease', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
@@ -178,6 +198,9 @@ io.on('connection', (socket) => {
 
             // --- 1. ГРАВЕЦЬ ТЯГНЕ КАРТИ ---
             const player = gameState.players[socket.id];
+            
+            if (!player.cards) player.cards = []; 
+            
             const drawnCards = [];
             let epidemicsDrawn = 0;
 
@@ -187,11 +210,9 @@ io.on('connection', (socket) => {
                     if (card === "ЕПІДЕМІЯ") {
                         epidemicsDrawn++;
                     } else {
-                        player.cards.push(card);
+                        player.cards.push(card); // Додаємо в стан гравця!
                         drawnCards.push(card);
                     }
-                } else {
-                    console.log("💀 ПРОГРАШ: Колода гравців закінчилася!");
                 }
             }
             if (drawnCards.length > 0) io.to(socket.id).emit('cards_drawn', drawnCards);
@@ -256,6 +277,34 @@ io.on('connection', (socket) => {
             gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
             gameState.actionsLeft = 4;
             io.emit('state_update', gameState);
+        }
+    });
+
+    // БУДІВНИЦТВО СТАНЦІЇ
+    socket.on('build_station', () => {
+        if (gameState.status !== 'PLAYING') return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (gameState.actionsLeft <= 0) return;
+
+        const player = gameState.players[socket.id];
+        // Перевіряємо чи є карта міста і чи немає там вже станції
+        if (player.cards.includes(player.city) && !gameState.researchStations.includes(player.city)) {
+            player.cards.splice(player.cards.indexOf(player.city), 1); // Витрачаємо карту
+            gameState.researchStations.push(player.city);
+            gameState.actionsLeft--;
+            io.emit('state_update', gameState);
+        }
+    });
+
+    // СКИДАННЯ ЗАЙВИХ КАРТ (>7)
+    socket.on('discard_card', (cardName) => {
+        const player = gameState.players[socket.id];
+        if (player && player.cards.length > 7) {
+            const idx = player.cards.indexOf(cardName);
+            if (idx !== -1) {
+                player.cards.splice(idx, 1);
+                io.emit('state_update', gameState);
+            }
         }
     });
 
