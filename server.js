@@ -69,8 +69,8 @@ io.on('connection', (socket) => {
             gameState.outbreaks = 0;
             gameState.infectionRateIndex = 0;
             gameState.infectionRate = 2;
-            gameState.researchStations = ["Atlanta"];
-            gameState.cured = {};
+            gameState.researchStations = ["Atlanta"]; 
+            gameState.cured = {}; 
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
@@ -81,51 +81,58 @@ io.on('connection', (socket) => {
                 gameState.turnOrder.push(p.id); 
             });
 
-            // 1. Ініціалізація інфекцій
-            gameState.infections = {};
-            infectionDeck = Object.keys(cities);
+            // === 1. ІНІЦІАЛІЗАЦІЯ ІНФЕКЦІЙ ===
+            gameState.infections = {}; // Очищаємо всі інфекції
+            infectionDeck = Object.keys(cities); // Створюємо колоду інфекцій
             infectionDiscard = [];
 
+            // Перемішуємо колоду інфекцій
             for (let i = infectionDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [infectionDeck[i], infectionDeck[j]] = [infectionDeck[j], infectionDeck[i]];
             }
 
+            // Функція розкладання кубиків
             function infectCities(amountOfCities, cubesToPlace) {
                 for (let i = 0; i < amountOfCities; i++) {
-                    const city = infectionDeck.pop();
-                    gameState.infections[city] = cubesToPlace;
-                    infectionDiscard.push(city);
+                    if (infectionDeck.length > 0) {
+                        const city = infectionDeck.pop();
+                        gameState.infections[city] = cubesToPlace;
+                        infectionDiscard.push(city);
+                        console.log(`Стартова інфекція: ${cubesToPlace} кубиків у ${city}`); // Додали лог для перевірки
+                    }
                 }
             }
 
+            // Розкладаємо 9 стартових інфекцій (3 по 3, 3 по 2, 3 по 1)
             infectCities(3, 3);
             infectCities(3, 2);
             infectCities(3, 1);
 
-            // 2. Ініціалізація колоди гравців та ЕПІДЕМІЙ
+            // === 2. ІНІЦІАЛІЗАЦІЯ КОЛОДИ ГРАВЦІВ (З ЕПІДЕМІЯМИ) ===
             let initialPlayerDeck = Object.keys(cities); 
+            // Перемішуємо міста для роздачі гравцям
             for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
             }
 
-            // Роздаємо стартові карти (без епідемій)
+            // Роздаємо стартові карти гравцям (по 2 кожному)
             playersArr.forEach(p => {
                 for(let i = 0; i < 2; i++) {
                     if(initialPlayerDeck.length > 0) p.cards.push(initialPlayerDeck.pop());
                 }
             });
 
-            // Ділимо залишок колоди на 4 стопки
+            // Ділимо залишок колоди на 4 стопки для Епідемій
             const numEpidemics = 4;
             const piles = Array.from({ length: numEpidemics }, () => []);
             initialPlayerDeck.forEach((card, index) => {
                 piles[index % numEpidemics].push(card);
             });
 
-            // Додаємо в кожну стопку 1 Епідемію, тасуємо і збираємо фінальну колоду
             playerDeck = [];
+            // Замішуємо Епідемії і збираємо колоду гравця
             for (let i = piles.length - 1; i >= 0; i--) {
                 let pile = piles[i];
                 pile.push("ЕПІДЕМІЯ");
@@ -133,9 +140,10 @@ io.on('connection', (socket) => {
                     const j = Math.floor(Math.random() * (k + 1));
                     [pile[k], pile[j]] = [pile[j], pile[k]];
                 }
-                playerDeck = playerDeck.concat(pile); // Кладемо стопку наверх
+                playerDeck = playerDeck.concat(pile); 
             }
 
+            // ВІДПРАВЛЯЄМО СТАН ГРИ ВСІМ
             io.emit('game_started', { cities, gameState });
         }
     }
