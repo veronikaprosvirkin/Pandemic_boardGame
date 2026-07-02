@@ -148,37 +148,60 @@ io.on('connection', (socket) => {
         }
     }
 
-    socket.on('move_player', (targetCity) => {
+    socket.on('move_player', (data) => {
+        const targetCity = data.targetCity;
+        const pawnId = data.pawnId || socket.id;
+
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
 
         const player = gameState.players[socket.id];
-        const currentCity = cities[player.city];
         if (player.cards.length > 7) return;
 
+        const isDispatcher = (player.role === "Диспетчер");
+        if (pawnId !== socket.id && !isDispatcher) return; // Тільки Диспетчер може рухати чужі фішки
+
+        const movingPlayer = gameState.players[pawnId];
+        if (!movingPlayer) return;
+
+        const currentCity = cities[movingPlayer.city];
         let moved = false;
+
+        // 1. Сусіднє місто
         if (currentCity && currentCity.connections.includes(targetCity)) {
             moved = true;
         }
-        // 2. Прямий рейс (скинути карту міста, КУДИ летиш)
+        // 2. Спец-рух Диспетчера: перекинути фішку в будь-яке місто, де ВЖЕ Є інший гравець
+        else if (isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
+            moved = true;
+        }
+        // 3. Прямий рейс (Диспетчер скидає СВОЮ карту, куди летить фішка)
         else if (player.cards.includes(targetCity)) {
             player.cards.splice(player.cards.indexOf(targetCity), 1);
             moved = true;
         }
-        // 3. Чартерний рейс (скинути карту міста, ДЕ стоїш)
-        else if (player.cards.includes(player.city)) {
-            player.cards.splice(player.cards.indexOf(player.city), 1);
+        // 4. Чартерний рейс (Диспетчер скидає СВОЮ карту того міста, де стоїть керована фішка)
+        else if (player.cards.includes(movingPlayer.city)) {
+            player.cards.splice(player.cards.indexOf(movingPlayer.city), 1);
             moved = true;
         }
-        // 4. Службовий рейс (між двома станціями)
-        else if (gameState.researchStations.includes(player.city) && gameState.researchStations.includes(targetCity)) {
+        // 5. Службовий рейс (між станціями)
+        else if (gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
             moved = true;
         }
 
         if (moved) {
-            player.city = targetCity;
+            movingPlayer.city = targetCity;
             gameState.actionsLeft--;
+
+            // Якщо диспетчер рухає МЕДИКА, медик лікує місто автоматично (пасивна навичка)
+            if (movingPlayer.role === "Медик") {
+                const cityColor = cities[movingPlayer.city].color;
+                if (gameState.cured && gameState.cured[cityColor]) {
+                    gameState.infections[movingPlayer.city] = 0;
+                }
+            }
             io.emit('state_update', gameState); 
         }
     });
@@ -259,6 +282,11 @@ io.on('connection', (socket) => {
                         player.cards.push(card);
                         drawnCards.push(card);
                     }
+                } else {
+                    // === ПОРАЗКА 1: ЗАКІНЧИЛИСЯ КАРТИ ===
+                    gameState.status = 'GAME_OVER';
+                    io.emit('game_over', { win: false, reason: 'СВІТ ЗАГИНУВ... У вас закінчився час (порожня колода гравців).' });
+                    return; // Гра негайно зупиняється
                 }
             }
             if (drawnCards.length > 0) io.to(socket.id).emit('cards_drawn', drawnCards);
@@ -277,12 +305,19 @@ io.on('connection', (socket) => {
                         gameState.infections[bottomCity] = 0;
                     }
                     
-                    // === ЗАХИСТ КАРАНТИНУ ВІД ЕПІДЕМІЇ ===
+                    // ЗАХИСТ КАРАНТИНУ ВІД ЕПІДЕМІЇ
                     if (!isQuarantined(bottomCity)) {
                         gameState.infections[bottomCity] += 3;
                         if (gameState.infections[bottomCity] > 3) {
                             gameState.outbreaks++; 
                             gameState.infections[bottomCity] = 3;
+                            
+                            // === ПОРАЗКА 2: 8 СПАЛАХІВ ===
+                            if (gameState.outbreaks >= 8) {
+                                gameState.status = 'GAME_OVER';
+                                io.emit('game_over', { win: false, reason: 'СВІТ ЗАГИНУВ... Досягнуто критичний рівень (8 спалахів).' });
+                                return;
+                            }
                         }
                     }
                     
@@ -309,12 +344,19 @@ io.on('connection', (socket) => {
                         gameState.infections[infectedCity] = 0;
                     }
 
-                    // === ЗАХИСТ КАРАНТИНУ ВІД ЗВИЧАЙНИХ ХВОРОБ ===
+                    // ЗАХИСТ КАРАНТИНУ ВІД ЗВИЧАЙНИХ ХВОРОБ
                     if (!isQuarantined(infectedCity)) {
-                        infectedCitiesThisTurn.push(infectedCity); // Сповіщаємо тільки якщо хвороба реально з'явилася
+                        infectedCitiesThisTurn.push(infectedCity); 
                         if (gameState.infections[infectedCity] >= 3) {
                             gameState.outbreaks++; 
                             console.log(`💥 СПАЛАХ у місті ${infectedCity}!`);
+                            
+                            // === ПОРАЗКА 2: 8 СПАЛАХІВ ===
+                            if (gameState.outbreaks >= 8) {
+                                gameState.status = 'GAME_OVER';
+                                io.emit('game_over', { win: false, reason: 'СВІТ ЗАГИНУВ... Досягнуто критичний рівень (8 спалахів).' });
+                                return;
+                            }
                         } else {
                             gameState.infections[infectedCity]++; 
                         }
@@ -402,6 +444,13 @@ io.on('connection', (socket) => {
                 gameState.actionsLeft--;
                 io.emit('state_update', gameState);
                 io.emit('cure_discovered', color); // Сповіщаємо всіх про успіх
+                io.emit('cure_discovered', color); // Сповіщаємо всіх про успіх
+                
+                // === ПЕРЕМОГА ===
+                if (Object.keys(gameState.cured).length >= 4) {
+                    gameState.status = 'GAME_OVER';
+                    io.emit('game_over', { win: true, reason: 'ЛЮДСТВО ВРЯТОВАНО! Винайдено всі 4 вакцини!' });
+                }
                 return;
             }
         }

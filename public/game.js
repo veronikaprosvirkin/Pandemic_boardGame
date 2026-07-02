@@ -1,6 +1,5 @@
 const socket = io();
 
-// Елементи DOM
 const lobbyView = document.getElementById('lobby-view');
 const gameView = document.getElementById('game-view');
 const btnReady = document.getElementById('btn-ready');
@@ -16,7 +15,7 @@ let mapData = {};
 let currentGameState = {};
 let myPlayerId = null;
 
-let visualPlayers = {}; // Для плавної анімації
+let visualPlayers = {}; 
 
 const SCALE_X = 1.0;
 const SCALE_Y = 1.0;
@@ -36,14 +35,12 @@ const roleDescriptions = {
     "Диспетчер": "🚁 Може рухати чужі фішки як свої.",
     "Дослідник": "📑 Може віддавати карти іншим гравцям.",
     "Фахівець із карантину": "🛑 Запобігає поширенню хвороб.",
-    "Інженер": "🛠️ Може будувати дослідну станцію у місті без карти."
+    "Інженер": "🛠️ Може будувати дослідну станцію у своєму місті без карти."
 };
 
-// ================== ЛОБІ ==================
 socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
     
-    // Перевіряємо, чи достатньо гравців і чи всі готові
     let allReady = true;
     let playerCount = 0;
 
@@ -52,7 +49,6 @@ socket.on('lobby_update', (players) => {
         if (!p.isReady) allReady = false;
 
         const li = document.createElement('li');
-        // Додаємо стиль для списку
         li.style.padding = "10px";
         li.style.borderBottom = "1px solid #4a5568";
         li.style.color = p.isReady ? "#48bb78" : "#e2e8f0";
@@ -60,7 +56,6 @@ socket.on('lobby_update', (players) => {
         lobbyPlayersList.appendChild(li);
     });
 
-    // Оновлюємо текст (замість [object...])
     const statusText = document.getElementById('lobby-status');
     if (statusText) {
         if (playerCount < 2) {
@@ -76,7 +71,7 @@ socket.on('lobby_update', (players) => {
 btnReady.addEventListener('click', () => {
     socket.emit('player_ready');
     btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
-    btnReady.style.backgroundColor = "#718096"; // Робимо кнопку сірою ТІЛЬКИ ПІСЛЯ натискання
+    btnReady.style.backgroundColor = "#718096"; 
     btnReady.disabled = true;
 });
 
@@ -84,7 +79,6 @@ socket.on('game_already_started', () => {
     lobbyView.innerHTML = "<div class='panel lobby-panel'><h2 class='text-blue'>Гра вже почалася!</h2><p class='text-gray'>Ви не можете приєднатися зараз.</p></div>";
 });
 
-// ================== СТАРТ ГРИ ==================
 socket.on('game_started', (data) => {
     myPlayerId = socket.id; 
     mapData = data.cities;
@@ -92,7 +86,6 @@ socket.on('game_started', (data) => {
     
     lobbyView.classList.add('is-hidden');
     gameView.classList.remove('is-hidden');
-    gameView.classList.add('game-view-active');
 
     updateUI();
     draw(); 
@@ -103,7 +96,6 @@ socket.on('state_update', (newState) => {
     updateUI();
 });
 
-// ================== ІНТЕРФЕЙС (UI) ==================
 function updateUI() {
     if (!currentGameState.players || !currentGameState.players[myPlayerId]) return;
     
@@ -114,7 +106,6 @@ function updateUI() {
     const descEl = document.getElementById('my-role-desc');
     if (descEl) descEl.innerText = roleDescriptions[me.role];
 
-    // ВІДМАЛЬОВКА КАРТ ГРАВЦЯ
     const isOverLimit = me.cards && me.cards.length > 7;
     const cardsContainer = document.getElementById('my-cards-container');
     if (cardsContainer) {
@@ -128,13 +119,11 @@ function updateUI() {
                 cardEl.className = 'player-card'; 
                 cardEl.style.backgroundColor = cityColor; 
                 
-                // Якщо карт > 7, робимо їх клікабельними для скидання
-                if (isOverLimit && isMyTurn) {
+                if (isOverLimit && currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId) {
                     cardEl.style.cursor = "pointer";
                     cardEl.style.border = "2px solid #e53e3e"; 
                     cardEl.onclick = () => socket.emit('discard_card', cardCity);
                 }
-
                 cardsContainer.appendChild(cardEl);
             });
         } else {
@@ -143,22 +132,18 @@ function updateUI() {
     }
 
     if (currentGameState.turnOrder && currentGameState.turnOrder.length > 0) {
-        if (currentGameState.currentTurnIndex >= currentGameState.turnOrder.length) {
-            currentGameState.currentTurnIndex = 0; 
-        }
-
-        const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
-        const isMyTurn = (activePlayerId === myPlayerId);
-        const activePlayer = currentGameState.players[activePlayerId];
+        const isMyTurn = (currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId);
+        const activePlayer = currentGameState.players[currentGameState.turnOrder[currentGameState.currentTurnIndex]];
 
         const turnIndicator = document.getElementById('turn-indicator');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const actionsSpan = document.getElementById('my-actions');
         
-        // Знаходимо всі кнопки
         const btnTreat = document.getElementById('btn-treat');
         const btnBuild = document.getElementById('btn-build');
         const btnCure = document.getElementById('btn-cure'); 
+        const dispatcherMenu = document.getElementById('dispatcher-menu');
+        const dispatcherSelect = document.getElementById('dispatcher-select');
         const tradeMenu = document.getElementById('trade-menu');
         const tradeSelect = document.getElementById('trade-select');
 
@@ -168,35 +153,30 @@ function updateUI() {
             turnIndicator.classList.add('turn-indicator-active');
             
             if (isOverLimit) {
-                actionsSpan.innerText = "СКИНЬТЕ КАРТИ (натисніть на них)";
+                actionsSpan.innerText = "СКИНЬТЕ КАРТИ";
                 actionsSpan.style.color = "#e53e3e";
                 endTurnBtn.classList.add('is-hidden');
                 if (btnTreat) btnTreat.classList.add('is-hidden');
                 if (btnBuild) btnBuild.classList.add('is-hidden');
                 if (btnCure) btnCure.classList.add('is-hidden'); 
+                if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
                 if (tradeMenu) tradeMenu.classList.add('is-hidden');
             } else {
                 actionsSpan.innerText = currentGameState.actionsLeft;
                 actionsSpan.style.color = "#ed8936";
                 endTurnBtn.classList.remove('is-hidden');
 
-                // 1. КНОПКА ЛІКУВАННЯ
+                // 1. ЛІКУВАННЯ
                 if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
                     btnTreat.classList.remove('is-hidden');
-                    // Додали перевірку для Медика та винайдених ліків
                     const cityColor = mapData[me.city] ? mapData[me.city].color : null;
                     const isCured = currentGameState.cured && currentGameState.cured[cityColor];
-                    
-                    if (me.role === "Медик" || isCured) {
-                        btnTreat.innerText = "💊 Вилікувати ВСІ кубики";
-                    } else {
-                        btnTreat.innerText = "💊 Вилікувати 1 кубик";
-                    }
+                    btnTreat.innerText = (me.role === "Медик" || isCured) ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
                 } else {
                     btnTreat.classList.add('is-hidden');
                 }
                 
-                // 2. КНОПКА БУДІВНИЦТВА
+                // 2. БУДІВНИЦТВО
                 if (btnBuild) {
                     const hasStationHere = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
                     const canBuild = !hasStationHere && (me.role === "Інженер" || me.cards.includes(me.city));
@@ -209,7 +189,7 @@ function updateUI() {
                     }
                 }
 
-                // 3. КНОПКА ВАКЦИНИ
+                // 3. ВАКЦИНА
                 if (btnCure) {
                     const atStation = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
                     const neededCureCards = me.role === "Вчений" ? 4 : 5;
@@ -225,7 +205,6 @@ function updateUI() {
                         });
                         
                         if (!currentGameState.cured) currentGameState.cured = {};
-                        
                         for (const [col, count] of Object.entries(colorsCount)) {
                             if (count >= neededCureCards && !currentGameState.cured[col]) {
                                 canCure = true;
@@ -242,16 +221,32 @@ function updateUI() {
                     }
                 }
 
-                // 4. ЛОГІКА ОБМІНУ КАРТАМИ
+                // 4. МЕНЮ ДИСПЕТЧЕРА
+                if (me.role === "Диспетчер") {
+                    if (dispatcherMenu && dispatcherSelect) {
+                        dispatcherMenu.classList.remove('is-hidden');
+                        dispatcherSelect.innerHTML = `<option value="${myPlayerId}">Моя фішка (Диспетчер)</option>`;
+                        Object.values(currentGameState.players).forEach(p => {
+                            if (p.id !== myPlayerId) {
+                                dispatcherSelect.innerHTML += `<option value="${p.id}">Фішка: ${p.role} (${p.city})</option>`;
+                            }
+                        });
+                    }
+                } else {
+                    if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
+                }
+
+                // 5. ОБМІН КАРТАМИ
                 if (tradeMenu && tradeSelect) {
                     tradeSelect.innerHTML = ''; 
                     let hasTrades = false;
 
                     const otherPlayersHere = Object.values(currentGameState.players).filter(p => p.id !== myPlayerId && p.city === me.city);
+                    const btnTradeConfirm = document.getElementById('btn-trade-confirm');
 
                     if (otherPlayersHere.length > 0) {
+                        tradeMenu.classList.remove('is-hidden');
                         otherPlayersHere.forEach(other => {
-                            // Що я можу ВІДДАТИ?
                             if (me.role === "Дослідник") {
                                 me.cards.forEach(c => {
                                     tradeSelect.innerHTML += `<option value="give|${other.id}|${c}">Віддати ${c} (${other.role})</option>`;
@@ -262,7 +257,6 @@ function updateUI() {
                                 hasTrades = true;
                             }
 
-                            // Що я можу ВЗЯТИ?
                             if (other.role === "Дослідник") {
                                 other.cards.forEach(c => {
                                     tradeSelect.innerHTML += `<option value="take|${other.id}|${c}">Взяти ${c} (${other.role})</option>`;
@@ -273,17 +267,25 @@ function updateUI() {
                                 hasTrades = true;
                             }
                         });
-                    }
 
-                    if (hasTrades) {
-                        tradeMenu.classList.remove('is-hidden');
+                        if (!hasTrades) {
+                            tradeSelect.innerHTML = `<option value="">Потрібна карта міста ${me.city}!</option>`;
+                            if (btnTradeConfirm) {
+                                btnTradeConfirm.disabled = true;
+                                btnTradeConfirm.style.opacity = "0.5";
+                            }
+                        } else {
+                            if (btnTradeConfirm) {
+                                btnTradeConfirm.disabled = false;
+                                btnTradeConfirm.style.opacity = "1";
+                            }
+                        }
                     } else {
                         tradeMenu.classList.add('is-hidden');
                     }
                 }
             }
         } else {
-            // === ЯКЩО НЕ ВАШ ХІД ===
             if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             turnIndicator.classList.remove('turn-indicator-active');
             turnIndicator.classList.add('turn-indicator-waiting');
@@ -294,11 +296,11 @@ function updateUI() {
             if (btnTreat) btnTreat.classList.add('is-hidden');
             if (btnBuild) btnBuild.classList.add('is-hidden');
             if (btnCure) btnCure.classList.add('is-hidden'); 
+            if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
             if (tradeMenu) tradeMenu.classList.add('is-hidden');
         }
     }
 
-    // === ВІДМАЛЬОВКА ВИЛІКУВАНИХ ХВОРОБ (КОЛБИ) ===
     const curesContainer = document.getElementById('cures-container');
     if (curesContainer) {
         curesContainer.innerHTML = '';
@@ -318,7 +320,6 @@ function updateUI() {
     }
 }
 
-// ================== ВІДМАЛЬОВКА (CANVAS) ==================
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -329,44 +330,50 @@ function draw() {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // === НОВЕ: ВИЗНАЧАЄМО ДОСТУПНІ МІСТА ДЛЯ ПІДСВІЧУВАННЯ ===
     let reachableCities = [];
-    let myCity = null;
+    let activeCity = null;
     const me = currentGameState.players ? currentGameState.players[myPlayerId] : null;
     const isMyTurn = currentGameState.status === 'PLAYING' && 
                      currentGameState.turnOrder && 
                      currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId;
 
     if (isMyTurn && me) {
-        myCity = me.city;
-        const myCityData = mapData[myCity];
-        
-        // 1. На авто/поромі (сусідні міста)
-        if (myCityData && myCityData.connections) {
-            reachableCities.push(...myCityData.connections); 
+        let targetPawnId = myPlayerId;
+        if (me.role === "Диспетчер") {
+            const sel = document.getElementById('dispatcher-select');
+            if (sel) targetPawnId = sel.value;
         }
         
-        if (me.cards) {
-            // 2. Прямий рейс (скидаємо карту куди летимо)
-            reachableCities.push(...me.cards); 
-            // 3. Чартер (скидаємо карту де стоїмо - летимо будь-куди)
-            if (me.cards.includes(myCity)) {
-                reachableCities = Object.keys(mapData); 
+        const movingPlayer = currentGameState.players[targetPawnId];
+        if (movingPlayer) {
+            activeCity = movingPlayer.city;
+            const activeCityData = mapData[activeCity];
+            
+            if (activeCityData && activeCityData.connections) {
+                reachableCities.push(...activeCityData.connections); 
             }
-        }
-        
-        // 4. Службовий рейс (між станціями)
-        const stations = currentGameState.researchStations || [];
-        if (stations.includes(myCity)) {
-            reachableCities.push(...stations);
+            if (me.role === "Диспетчер" && targetPawnId !== myPlayerId) {
+                Object.values(currentGameState.players).forEach(p => {
+                    if (p.id !== targetPawnId) reachableCities.push(p.city);
+                });
+            }
+            if (me.cards) {
+                reachableCities.push(...me.cards); 
+                if (me.cards.includes(activeCity)) {
+                    reachableCities = Object.keys(mapData); 
+                }
+            }
+            const stations = currentGameState.researchStations || [];
+            if (stations.includes(activeCity)) {
+                reachableCities.push(...stations);
+            }
         }
     }
 
     const time = Date.now();
     const pulse = (Math.sin(time / 150) + 1) / 2;
-    const slowPulse = (Math.sin(time / 300) + 1) / 2; // Для плавного підсвічування шляхів
+    const slowPulse = (Math.sin(time / 300) + 1) / 2;
 
-    // === 1. ЛІНІЇ ===
     ctx.lineWidth = 3;
     const drawnLines = new Set();
 
@@ -382,10 +389,9 @@ function draw() {
                 const end = getCoords(target.x, target.y);
                 const dist = Math.hypot(start.x - end.x, start.y - end.y);
 
-                // Перевіряємо, чи це доступний зараз шлях
                 const isReachablePath = isMyTurn && 
-                    ((myCity === cityName && reachableCities.includes(targetName)) || 
-                     (myCity === targetName && reachableCities.includes(cityName)));
+                    ((activeCity === cityName && reachableCities.includes(targetName)) || 
+                     (activeCity === targetName && reachableCities.includes(cityName)));
 
                 ctx.beginPath();
                 if (dist > canvas.width * 0.7) { 
@@ -400,7 +406,6 @@ function draw() {
                     ctx.lineTo(end.x, end.y);
                 }
 
-                // Підсвічуємо лінію помаранчевим, якщо туди можна піти
                 if (isReachablePath) {
                     ctx.lineWidth = 5;
                     ctx.strokeStyle = `rgba(237, 137, 54, ${0.4 + 0.6 * slowPulse})`;
@@ -413,13 +418,11 @@ function draw() {
         });
     }
 
-    // === 2. МІСТА ТА ТЕКСТ ===
     for (const [cityName, cityData] of Object.entries(mapData)) {
         const pos = getCoords(cityData.x, cityData.y);
         const hasStation = currentGameState.researchStations && currentGameState.researchStations.includes(cityName);
-        const isReachable = isMyTurn && reachableCities.includes(cityName) && cityName !== myCity;
+        const isReachable = isMyTurn && reachableCities.includes(cityName) && cityName !== activeCity;
 
-        // Малюємо ореол-підсвічування для доступних міст
         if (isReachable) {
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, 20 + (4 * slowPulse), 0, Math.PI * 2);
@@ -427,7 +430,6 @@ function draw() {
             ctx.fill();
         }
 
-        // Сама крапка міста
         ctx.fillStyle = cityData.color;
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, hasStation ? 14 : 12, 0, Math.PI * 2);
@@ -446,36 +448,31 @@ function draw() {
         ctx.stroke();
         ctx.shadowBlur = 0; 
         
-        // ТЕКСТ: Піднімаємо вгору і робимо жорстку обводку замість "мильної" тіні
         ctx.fillStyle = "white"; 
         ctx.font = hasStation ? "bold 16px Arial" : "bold 14px Arial"; 
         
         const textToDraw = hasStation ? `🔬 ${cityName}` : cityName;
         const textWidth = ctx.measureText(textToDraw).width;
-        
         const textX = pos.x - (textWidth / 2);
-        const textY = pos.y - 20; // ПІДНЯЛИ ТЕКСТ НАД МІСТОМ
+        const textY = pos.y - 20;
 
         ctx.lineWidth = 3;
         ctx.strokeStyle = "black";
-        ctx.strokeText(textToDraw, textX, textY); // Чорна обводка
-        ctx.fillText(textToDraw, textX, textY);   // Білий текст
+        ctx.strokeText(textToDraw, textX, textY); 
+        ctx.fillText(textToDraw, textX, textY);   
     }
 
-    // === 3. КУБИКИ ІНФЕКЦІЙ (Під містом) ===
     if (currentGameState.infections) {
         for (const [cityName, count] of Object.entries(currentGameState.infections)) {
             if (count > 0 && mapData[cityName]) {
                 const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
                 const cubeColor = mapData[cityName].color;
-
                 const cubeSize = 12;
                 const padding = 2;
                 const totalWidth = (count * cubeSize) + ((count - 1) * padding);
                 
-                // Центруємо кубики під містом
                 const startX = pos.x - (totalWidth / 2);
-                const cy = pos.y + 16; // ОПУСТИЛИ КУБИКИ ПІД МІСТО
+                const cy = pos.y + 16; 
 
                 for (let i = 0; i < count; i++) {
                     const cx = startX + (i * (cubeSize + padding));
@@ -500,7 +497,6 @@ function draw() {
         }
     }
 
-    // 4. Гравці (Lerp анімація)
     if (currentGameState.players) {
         Object.values(currentGameState.players).forEach((player, index) => {
             const targetCity = mapData[player.city];
@@ -538,16 +534,15 @@ function draw() {
         });
     }
 
-    // 5. ГЛОБАЛЬНА ПАНЕЛЬ НА КАРТІ (Північ)
     if (currentGameState.status === 'PLAYING') {
         const infRate = currentGameState.infectionRate || 2;
         const outbrks = currentGameState.outbreaks || 0;
         const text = `☣️ Швидкість інфекції: ${infRate}      |      💥 Спалахи: ${outbrks} / 8`;
 
         ctx.font = "bold 18px Arial";
-        const textWidth = ctx.measureText(text).width; // Вимірюємо ширину тексту
+        const textWidth = ctx.measureText(text).width; 
         
-        const panelWidth = textWidth + 40; // Динамічна ширина (+ відступи)
+        const panelWidth = textWidth + 40; 
         const panelHeight = 50;
         const panelX = (canvas.width - panelWidth) / 2;
         const panelY = 15;
@@ -577,7 +572,6 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
-// ================== ДІЇ ГРАВЦЯ ==================
 const endTurnBtn = document.getElementById('end-turn-btn');
 if (endTurnBtn) {
     endTurnBtn.addEventListener('click', () => {
@@ -585,25 +579,14 @@ if (endTurnBtn) {
     });
 }
 
-// Кнопка Підтвердження обміну
 const btnTradeConfirm = document.getElementById('btn-trade-confirm');
 if (btnTradeConfirm) {
     btnTradeConfirm.addEventListener('click', () => {
         const val = document.getElementById('trade-select').value;
         if (!val) return;
         
-        // Розбиваємо значення з option (воно має формат "give|ID_гравця|Назва_міста")
         const parts = val.split('|'); 
-        const actionType = parts[0]; // "give" або "take"
-        const targetPlayerId = parts[1];
-        const cardToTrade = parts[2];
-
-        // Відправляємо на сервер
-        socket.emit('share_knowledge', { 
-            action: actionType, 
-            targetId: targetPlayerId, 
-            cardCity: cardToTrade 
-        });
+        socket.emit('share_knowledge', { action: parts[0], targetId: parts[1], cardCity: parts[2] });
     });
 }
 
@@ -621,16 +604,6 @@ if (btnCure) {
     });
 }
 
-// Сповіщення про ліміт станцій
-socket.on('max_stations_reached', () => {
-    showNotification(`❌ Досягнуто ліміт! На карті вже є 6 станцій.`, 'epidemic');
-});
-
-// Сповіщення про винайдення
-socket.on('cure_discovered', (color) => {
-    showNotification(`🧪 ВИНАЙДЕНО ЛІКИ!`, 'card', color);
-});
-
 const btnBuild = document.getElementById('btn-build');
 if (btnBuild) {
     btnBuild.addEventListener('click', () => {
@@ -638,7 +611,6 @@ if (btnBuild) {
     });
 }
 
-// Рух по карті
 canvas.addEventListener('click', (e) => {
     if (currentGameState.status !== 'PLAYING') return;
 
@@ -657,14 +629,40 @@ canvas.addEventListener('click', (e) => {
         const pos = getCoords(cityData.x, cityData.y);
         const dist = Math.hypot(x - pos.x, y - pos.y);
         if (dist < 20) {
-            socket.emit('move_player', cityName);
+            let targetPawnId = myPlayerId;
+            if (me.role === "Диспетчер") {
+                const sel = document.getElementById('dispatcher-select');
+                if (sel) targetPawnId = sel.value;
+            }
+            socket.emit('move_player', { targetCity: cityName, pawnId: targetPawnId });
             break;
         }
     }
 });
-// ==========================================
-// СИСТЕМА СПЛИВАЮЧИХ ПОВІДОМЛЕНЬ
-// ==========================================
+
+// КІНЕЦЬ ГРИ
+socket.on('game_over', (data) => {
+    const screen = document.getElementById('game-over-screen');
+    const title = document.getElementById('game-over-title');
+    const reason = document.getElementById('game-over-reason');
+
+    if(screen) screen.classList.remove('is-hidden');
+    
+    if (data.win) {
+        if(title) { title.innerText = "ПЕРЕМОГА!"; title.style.color = "#48bb78"; }
+    } else {
+        if(title) { title.innerText = "ПОРАЗКА"; title.style.color = "#e53e3e"; }
+    }
+    if(reason) reason.innerText = data.reason;
+});
+
+socket.on('max_stations_reached', () => {
+    showNotification(`❌ Досягнуто ліміт! На карті вже є 6 станцій.`, 'epidemic');
+});
+
+socket.on('cure_discovered', (color) => {
+    showNotification(`🧪 ВИНАЙДЕНО ЛІКИ!`, 'card', color);
+});
 
 function showNotification(message, type = 'card', cityColor = null) {
     let container = document.getElementById('notifications-container');
@@ -678,30 +676,25 @@ function showNotification(message, type = 'card', cityColor = null) {
     toast.className = 'toast-message';
     toast.innerHTML = message;
     
-    // Застосовуємо стилі залежно від типу події
     if (type === 'card') {
         toast.classList.add('toast-card');
         toast.style.backgroundColor = cityColor || "#3182ce";
     } else if (type === 'infection') {
         toast.classList.add('toast-infection');
-        if (cityColor) toast.style.borderLeftColor = cityColor; // Фарбуємо тільки смужку збоку
+        if (cityColor) toast.style.borderLeftColor = cityColor; 
     } else if (type === 'epidemic') {
         toast.classList.add('toast-epidemic');
     }
 
     container.appendChild(toast);
 
-    // Анімація появи
     setTimeout(() => toast.classList.add('show'), 10);
-
-    // Зникнення через 4 секунди
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 4000);
 }
 
-// 1. Сповіщення про взяті карти (тільки для поточного гравця)
 socket.on('cards_drawn', (cards) => {
     cards.forEach(card => {
         const cityColor = mapData[card] ? mapData[card].color : "#4a5568";
@@ -709,7 +702,6 @@ socket.on('cards_drawn', (cards) => {
     });
 });
 
-// 2. Сповіщення про поширення хвороби (для всіх гравців)
 socket.on('infection_drawn', (citiesList) => {
     citiesList.forEach(city => {
         const cityColor = mapData[city] ? mapData[city].color : "#e53e3e";
@@ -717,7 +709,6 @@ socket.on('infection_drawn', (citiesList) => {
     });
 });
 
-// 3. Сповіщення про Епідемію (для всіх гравців)
 socket.on('epidemic_alert', (city) => {
     showNotification(`⚠️ ЕПІДЕМІЯ В МІСТІ<br><strong>${city}</strong>!`, 'epidemic');
 });

@@ -42,6 +42,10 @@
                         🧪 Винайти ліки
                     </button>
                 </div>
+                <div id="dispatcher-menu" class="cards-section dispatcher-menu is-hidden">
+                    <p class="dispatcher-title">🚁 Пульт Диспетчера (Керування фішками):</p>
+                    <select id="dispatcher-select" class="trade-select"></select>
+                </div>
                 <div id="trade-menu" class="cards-section trade-menu is-hidden">
                     <p class="trade-title">🔄 Обмін картами:</p>
                     <select id="trade-select" class="trade-select"></select>
@@ -69,6 +73,12 @@
         </div>
     </div>
 
+    <div id="game-over-screen" class="game-over-overlay is-hidden">
+        <h1 id="game-over-title" class="game-over-title"></h1>
+        <p id="game-over-reason" class="game-over-reason"></p>
+        <button onclick="location.reload()" class="action-button" style="width: 200px;">Грати знову</button>
+    </div>
+    
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
