@@ -236,3 +236,37 @@ body {
     border: 2px solid #fc8181;
     text-align: center;
 }
+/* =========================================
+   МЕНЮ ОБМІНУ КАРТАМИ
+   ========================================= */
+.trade-menu {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.trade-title {
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    color: #cbd5e0;
+}
+
+.trade-select {
+    width: 100%;
+    margin-bottom: 8px;
+    padding: 5px;
+    border-radius: 4px;
+    background: #2d3748;
+    color: white;
+    border: 1px solid #4a5568;
+}
+
+.btn-trade {
+    background-color: #805ad5;
+    color: white;
+    margin-top: 0;
+}
+
+.btn-trade:hover {
+    background-color: #6b46c1;
+}

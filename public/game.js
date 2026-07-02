@@ -131,7 +131,7 @@ function updateUI() {
                 // Якщо карт > 7, робимо їх клікабельними для скидання
                 if (isOverLimit && isMyTurn) {
                     cardEl.style.cursor = "pointer";
-                    cardEl.style.border = "2px solid #e53e3e"; // Червона рамка-підказка
+                    cardEl.style.border = "2px solid #e53e3e"; 
                     cardEl.onclick = () => socket.emit('discard_card', cardCity);
                 }
 
@@ -154,11 +154,13 @@ function updateUI() {
         const turnIndicator = document.getElementById('turn-indicator');
         const endTurnBtn = document.getElementById('end-turn-btn');
         const actionsSpan = document.getElementById('my-actions');
+        
+        // Знаходимо всі кнопки
         const btnTreat = document.getElementById('btn-treat');
         const btnBuild = document.getElementById('btn-build');
-        
-        // Знаходимо кнопку вакцини
         const btnCure = document.getElementById('btn-cure'); 
+        const tradeMenu = document.getElementById('trade-menu');
+        const tradeSelect = document.getElementById('trade-select');
 
         if (isMyTurn) {
             turnIndicator.innerText = "🟢 Ваш хід!";
@@ -172,6 +174,7 @@ function updateUI() {
                 if (btnTreat) btnTreat.classList.add('is-hidden');
                 if (btnBuild) btnBuild.classList.add('is-hidden');
                 if (btnCure) btnCure.classList.add('is-hidden'); 
+                if (tradeMenu) tradeMenu.classList.add('is-hidden');
             } else {
                 actionsSpan.innerText = currentGameState.actionsLeft;
                 actionsSpan.style.color = "#ed8936";
@@ -180,7 +183,15 @@ function updateUI() {
                 // 1. КНОПКА ЛІКУВАННЯ
                 if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
                     btnTreat.classList.remove('is-hidden');
-                    btnTreat.innerText = me.role === "Медик" ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
+                    // Додали перевірку для Медика та винайдених ліків
+                    const cityColor = mapData[me.city] ? mapData[me.city].color : null;
+                    const isCured = currentGameState.cured && currentGameState.cured[cityColor];
+                    
+                    if (me.role === "Медик" || isCured) {
+                        btnTreat.innerText = "💊 Вилікувати ВСІ кубики";
+                    } else {
+                        btnTreat.innerText = "💊 Вилікувати 1 кубик";
+                    }
                 } else {
                     btnTreat.classList.add('is-hidden');
                 }
@@ -216,7 +227,6 @@ function updateUI() {
                         if (!currentGameState.cured) currentGameState.cured = {};
                         
                         for (const [col, count] of Object.entries(colorsCount)) {
-                            // Якщо карт вистачає і цей колір ще НЕ вилікуваний
                             if (count >= neededCureCards && !currentGameState.cured[col]) {
                                 canCure = true;
                                 break;
@@ -231,23 +241,64 @@ function updateUI() {
                         btnCure.classList.add('is-hidden');
                     }
                 }
+
+                // 4. ЛОГІКА ОБМІНУ КАРТАМИ
+                if (tradeMenu && tradeSelect) {
+                    tradeSelect.innerHTML = ''; 
+                    let hasTrades = false;
+
+                    const otherPlayersHere = Object.values(currentGameState.players).filter(p => p.id !== myPlayerId && p.city === me.city);
+
+                    if (otherPlayersHere.length > 0) {
+                        otherPlayersHere.forEach(other => {
+                            // Що я можу ВІДДАТИ?
+                            if (me.role === "Дослідник") {
+                                me.cards.forEach(c => {
+                                    tradeSelect.innerHTML += `<option value="give|${other.id}|${c}">Віддати ${c} (${other.role})</option>`;
+                                    hasTrades = true;
+                                });
+                            } else if (me.cards.includes(me.city)) {
+                                tradeSelect.innerHTML += `<option value="give|${other.id}|${me.city}">Віддати ${me.city} (${other.role})</option>`;
+                                hasTrades = true;
+                            }
+
+                            // Що я можу ВЗЯТИ?
+                            if (other.role === "Дослідник") {
+                                other.cards.forEach(c => {
+                                    tradeSelect.innerHTML += `<option value="take|${other.id}|${c}">Взяти ${c} (${other.role})</option>`;
+                                    hasTrades = true;
+                                });
+                            } else if (other.cards.includes(me.city)) {
+                                tradeSelect.innerHTML += `<option value="take|${other.id}|${me.city}">Взяти ${me.city} (${other.role})</option>`;
+                                hasTrades = true;
+                            }
+                        });
+                    }
+
+                    if (hasTrades) {
+                        tradeMenu.classList.remove('is-hidden');
+                    } else {
+                        tradeMenu.classList.add('is-hidden');
+                    }
+                }
             }
         } else {
+            // === ЯКЩО НЕ ВАШ ХІД ===
             if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
             turnIndicator.classList.remove('turn-indicator-active');
             turnIndicator.classList.add('turn-indicator-waiting');
             actionsSpan.innerText = "Очікування...";
             actionsSpan.style.color = "#a0aec0";
             
-            // Ховаємо всі кнопки, коли не наш хід
             endTurnBtn.classList.add('is-hidden');
             if (btnTreat) btnTreat.classList.add('is-hidden');
             if (btnBuild) btnBuild.classList.add('is-hidden');
             if (btnCure) btnCure.classList.add('is-hidden'); 
+            if (tradeMenu) tradeMenu.classList.add('is-hidden');
         }
     }
 
-    // === НОВЕ: ВІДМАЛЬОВКА ВИЛІКУВАНИХ ХВОРОБ (КОЛБИ) ===
+    // === ВІДМАЛЬОВКА ВИЛІКУВАНИХ ХВОРОБ (КОЛБИ) ===
     const curesContainer = document.getElementById('cures-container');
     if (curesContainer) {
         curesContainer.innerHTML = '';
@@ -531,6 +582,28 @@ const endTurnBtn = document.getElementById('end-turn-btn');
 if (endTurnBtn) {
     endTurnBtn.addEventListener('click', () => {
         socket.emit('end_turn');
+    });
+}
+
+// Кнопка Підтвердження обміну
+const btnTradeConfirm = document.getElementById('btn-trade-confirm');
+if (btnTradeConfirm) {
+    btnTradeConfirm.addEventListener('click', () => {
+        const val = document.getElementById('trade-select').value;
+        if (!val) return;
+        
+        // Розбиваємо значення з option (воно має формат "give|ID_гравця|Назва_міста")
+        const parts = val.split('|'); 
+        const actionType = parts[0]; // "give" або "take"
+        const targetPlayerId = parts[1];
+        const cardToTrade = parts[2];
+
+        // Відправляємо на сервер
+        socket.emit('share_knowledge', { 
+            action: actionType, 
+            targetId: targetPlayerId, 
+            cardCity: cardToTrade 
+        });
     });
 }
 

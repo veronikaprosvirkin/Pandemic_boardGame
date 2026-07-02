@@ -201,15 +201,52 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('share_knowledge', ({ action, targetId, cardCity }) => {
+        if (gameState.status !== 'PLAYING') return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (gameState.actionsLeft <= 0) return;
+
+        const p1 = gameState.players[socket.id];
+        const p2 = gameState.players[targetId];
+        
+        if (!p1 || !p2 || p1.city !== p2.city) return;
+
+        if (action === 'give') {
+            const idx = p1.cards.indexOf(cardCity);
+            if (idx !== -1) {
+                p1.cards.splice(idx, 1);
+                p2.cards.push(cardCity);
+                gameState.actionsLeft--;
+            }
+        } else if (action === 'take') {
+            const idx = p2.cards.indexOf(cardCity);
+            if (idx !== -1) {
+                p2.cards.splice(idx, 1);
+                p1.cards.push(cardCity);
+                gameState.actionsLeft--;
+            }
+        }
+        io.emit('state_update', gameState);
+    });
+
+    function isQuarantined(city) {
+        for (let p of Object.values(gameState.players)) {
+            if (p.role === "Фахівець із карантину") {
+                if (p.city === city || (cities[p.city] && cities[p.city].connections.includes(city))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     socket.on('end_turn', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
 
             // --- 1. ГРАВЕЦЬ ТЯГНЕ КАРТИ ---
             const player = gameState.players[socket.id];
-            
             if (!player.cards) player.cards = []; 
-            
             const drawnCards = [];
             let epidemicsDrawn = 0;
 
@@ -219,7 +256,7 @@ io.on('connection', (socket) => {
                     if (card === "ЕПІДЕМІЯ") {
                         epidemicsDrawn++;
                     } else {
-                        player.cards.push(card); // Додаємо в стан гравця!
+                        player.cards.push(card);
                         drawnCards.push(card);
                     }
                 }
@@ -240,10 +277,13 @@ io.on('connection', (socket) => {
                         gameState.infections[bottomCity] = 0;
                     }
                     
-                    gameState.infections[bottomCity] += 3;
-                    if (gameState.infections[bottomCity] > 3) {
-                        gameState.outbreaks++; 
-                        gameState.infections[bottomCity] = 3;
+                    // === ЗАХИСТ КАРАНТИНУ ВІД ЕПІДЕМІЇ ===
+                    if (!isQuarantined(bottomCity)) {
+                        gameState.infections[bottomCity] += 3;
+                        if (gameState.infections[bottomCity] > 3) {
+                            gameState.outbreaks++; 
+                            gameState.infections[bottomCity] = 3;
+                        }
                     }
                     
                     io.emit('epidemic_alert', bottomCity);
@@ -257,30 +297,34 @@ io.on('connection', (socket) => {
                 infectionDiscard = []; 
             }
 
-            // --- 2. ФАЗА ІНФЕКЦІЇ ---
-            const infectedCitiesThisTurn = []; // Збираємо міста для сповіщень
+            // --- 2. ФАЗА ІНФЕКЦІЇ (ВИСУВАЄМО НОВІ ХВОРОБИ) ---
+            const infectedCitiesThisTurn = [];
 
             for (let i = 0; i < gameState.infectionRate; i++) {
                 if (infectionDeck.length > 0) {
                     const infectedCity = infectionDeck.pop();
                     infectionDiscard.push(infectedCity);
-                    infectedCitiesThisTurn.push(infectedCity);
-
+                    
                     if (gameState.infections[infectedCity] === undefined) {
                         gameState.infections[infectedCity] = 0;
                     }
 
-                    if (gameState.infections[infectedCity] >= 3) {
-                        gameState.outbreaks++; 
-                        console.log(`💥 СПАЛАХ у місті ${infectedCity}!`);
-                    } else {
-                        gameState.infections[infectedCity]++; 
+                    // === ЗАХИСТ КАРАНТИНУ ВІД ЗВИЧАЙНИХ ХВОРОБ ===
+                    if (!isQuarantined(infectedCity)) {
+                        infectedCitiesThisTurn.push(infectedCity); // Сповіщаємо тільки якщо хвороба реально з'явилася
+                        if (gameState.infections[infectedCity] >= 3) {
+                            gameState.outbreaks++; 
+                            console.log(`💥 СПАЛАХ у місті ${infectedCity}!`);
+                        } else {
+                            gameState.infections[infectedCity]++; 
+                        }
                     }
                 }
             }
             
-            // Відправляємо список міст усім гравцям для сповіщень
-            io.emit('infection_drawn', infectedCitiesThisTurn);
+            if (infectedCitiesThisTurn.length > 0) {
+                io.emit('infection_drawn', infectedCitiesThisTurn);
+            }
 
             // --- 3. ПЕРЕДАЧА ХОДУ ---
             gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
@@ -289,7 +333,6 @@ io.on('connection', (socket) => {
         }
     });
 
-    // БУДІВНИЦТВО СТАНЦІЇ
     // БУДІВНИЦТВО СТАНЦІЇ
     socket.on('build_station', () => {
         if (gameState.status !== 'PLAYING') return;

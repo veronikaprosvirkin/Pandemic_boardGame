@@ -35,12 +35,17 @@
                     <button id="btn-treat" class="action-button is-hidden">
                         💊 Лікувати хворобу
                     </button>
-                    <button id="btn-build" class="action-button is-hidden" style="background-color: #ecc94b; color: #1a202c;">
+                    <button id="btn-build" class="action-button btn-build is-hidden">
                         🏗️ Побудувати станцію
                     </button>
-                    <button id="btn-cure" class="action-button is-hidden" style="background-color: #48bb78; color: white;">
+                    <button id="btn-cure" class="action-button btn-cure is-hidden">
                         🧪 Винайти ліки
                     </button>
+                </div>
+                <div id="trade-menu" class="cards-section trade-menu is-hidden">
+                    <p class="trade-title">🔄 Обмін картами:</p>
+                    <select id="trade-select" class="trade-select"></select>
+                    <button id="btn-trade-confirm" class="action-button btn-trade">Підтвердити обмін</button>
                 </div>
             </div>
 
@@ -54,9 +59,9 @@
                         <span class="no-cards-text">Немає карт</span>
                     </div>
                 </div>
-                <div class="cards-section" style="margin-top: 15px;">
+                <div class="cards-section">
                     <p class="bottom-cards-title"><strong>Винайдені вакцини:</strong></p>
-                    <div id="cures-container" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div id="cures-container" class="cures-container">
                         <span class="no-cards-text">Поки немає</span>
                     </div>
                 </div>
