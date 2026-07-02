@@ -627,7 +627,6 @@ canvas.addEventListener('click', (e) => {
     if (currentGameState.actionsLeft <= 0) return; 
     
     const me = currentGameState.players[myPlayerId];
-    if (me.cards.length > 7) return;
 
     const rect = canvas.getBoundingClientRect();
     const x = (e.clientX - rect.left) * (canvas.width / rect.width);

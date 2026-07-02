@@ -234,7 +234,6 @@ io.on('connection', (socket) => {
         if (gameState.actionsLeft <= 0) return;
 
         const player = gameState.players[socket.id];
-        if (player.cards.length > 7) return;
 
         const isDispatcher = (player.role === "Диспетчер");
         if (pawnId !== socket.id && !isDispatcher) return; 
