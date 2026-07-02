@@ -273,11 +273,13 @@ function updateUI() {
                             if (btnTradeConfirm) {
                                 btnTradeConfirm.disabled = true;
                                 btnTradeConfirm.style.opacity = "0.5";
+                                btnTradeConfirm.style.cursor = "not-allowed";
                             }
                         } else {
                             if (btnTradeConfirm) {
                                 btnTradeConfirm.disabled = false;
                                 btnTradeConfirm.style.opacity = "1";
+                                btnTradeConfirm.style.cursor = "pointer";
                             }
                         }
                     } else {
@@ -307,9 +309,14 @@ function updateUI() {
         if (currentGameState.cured && Object.keys(currentGameState.cured).length > 0) {
             Object.entries(currentGameState.cured).forEach(([color, isCured]) => {
                 if (isCured) {
+                    const isEradicated = currentGameState.eradicated && currentGameState.eradicated[color];
                     const flask = document.createElement('div');
-                    flask.innerText = "🧪";
+                    flask.innerText = isEradicated ? "✨" : "🧪"; // Магія знищення!
                     flask.className = "cure-flask"; 
+                    if (isEradicated) {
+                        flask.style.border = "2px solid gold";
+                        flask.style.boxShadow = "0 0 10px gold";
+                    }
                     flask.style.backgroundColor = color;
                     curesContainer.appendChild(flask);
                 }
@@ -640,7 +647,7 @@ canvas.addEventListener('click', (e) => {
     }
 });
 
-// КІНЕЦЬ ГРИ
+// КІНЕЦЬ ГРИ ТА СПОВІЩЕННЯ
 socket.on('game_over', (data) => {
     const screen = document.getElementById('game-over-screen');
     const title = document.getElementById('game-over-title');
@@ -662,6 +669,10 @@ socket.on('max_stations_reached', () => {
 
 socket.on('cure_discovered', (color) => {
     showNotification(`🧪 ВИНАЙДЕНО ЛІКИ!`, 'card', color);
+});
+
+socket.on('disease_eradicated', (color) => {
+    showNotification(`🏆 ХВОРОБУ ЗНИЩЕНО! Кубики цього кольору більше не з'являться.`, 'card', color);
 });
 
 function showNotification(message, type = 'card', cityColor = null) {
