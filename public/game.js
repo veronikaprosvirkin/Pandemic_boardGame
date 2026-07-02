@@ -86,6 +86,7 @@ socket.on('game_started', (data) => {
     
     lobbyView.classList.add('is-hidden');
     gameView.classList.remove('is-hidden');
+    gameView.classList.add('game-view-active');
 
     updateUI();
     draw(); 
