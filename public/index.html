@@ -18,12 +18,16 @@
         </div>
     </div>
 
+    <!-- ТУТ ВАЖЛИВА СТРУКТУРА: game-view має бути контейнером (flex або grid), щоб canvas і ui-panel були поруч -->
     <div id="game-view" class="is-hidden game-view">
+        
+        <!-- ЛІВА ЧАСТИНА: МАПА -->
         <div id="game-container">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
         </div>
 
-        <div id="ui-panel">
+        <!-- ПРАВА ЧАСТИНА: БОКОВА ПАНЕЛЬ -->
+        <div id="ui-panel" class="ui-panel">
             <div class="panel">
                 <h2>Ваш статус</h2>
                 <p><strong>Роль:</strong> <span id="my-role" class="text-blue"></span></p>
@@ -42,10 +46,12 @@
                         🧪 Винайти ліки
                     </button>
                 </div>
+                
                 <div id="dispatcher-menu" class="cards-section dispatcher-menu is-hidden">
                     <p class="dispatcher-title">🚁 Пульт Диспетчера (Керування фішками):</p>
                     <select id="dispatcher-select" class="trade-select"></select>
                 </div>
+
                 <div id="trade-menu" class="cards-section trade-menu is-hidden">
                     <p class="trade-title">🔄 Обмін картами:</p>
                     <select id="trade-select" class="trade-select"></select>
@@ -71,14 +77,19 @@
                 </div>
             </div>
         </div>
-    </div>
 
+    </div> <!-- Кінець game-view -->
+
+    <!-- ЕКРАН ПЕРЕМОГИ / ПОРАЗКИ -->
     <div id="game-over-screen" class="game-over-overlay is-hidden">
         <h1 id="game-over-title" class="game-over-title"></h1>
         <p id="game-over-reason" class="game-over-reason"></p>
         <button onclick="location.reload()" class="action-button" style="width: 200px;">Грати знову</button>
     </div>
-    
+
+    <!-- КОНТЕЙНЕР ДЛЯ СПОВІЩЕНЬ -->
+    <div id="notifications-container"></div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
