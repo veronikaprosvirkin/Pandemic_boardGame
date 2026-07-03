@@ -190,7 +190,7 @@
             "London",
             "Paris",
             "Milan",
-            "St. Petersburg"
+            "Kyiv"
         ]
     },
     "Milan": {
@@ -203,14 +203,14 @@
             "Istanbul"
         ]
     },
-    "St. Petersburg": {
+    "Kyiv": {
         "color": "#2b6cb0",
         "x": 675,
         "y": 245,
         "connections": [
             "Essen",
             "Istanbul",
-            "Moscow"
+            "Kharkiv"
         ]
     },
     "Algiers": {
@@ -242,19 +242,19 @@
         "y": 289,
         "connections": [
             "Milan",
-            "St. Petersburg",
-            "Moscow",
+            "Kyiv",
+            "Kharkiv",
             "Baghdad",
             "Cairo",
             "Algiers"
         ]
     },
-    "Moscow": {
+    "Kharkiv": {
         "color": "#1a202c",
         "x": 767,
         "y": 233,
         "connections": [
-            "St. Petersburg",
+            "Kyiv",
             "Istanbul",
             "Tehran"
         ]

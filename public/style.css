@@ -179,6 +179,16 @@ body {
 #btn-treat { background-color: #3182ce; }
 #btn-treat:hover { background-color: #2b6cb0; }
 
+.btn-cure {
+    background-color: #38b2ac;
+    color: #1a202c;
+    text-shadow: none;
+}
+
+.btn-cure:hover {
+    background-color: #319795;
+}
+
 .end-turn-btn {
     background-color: #e53e3e;
     padding: 10px;
@@ -270,6 +280,17 @@ body {
 .btn-trade:hover {
     background-color: #6b46c1;
 }
+
+.btn-build {
+    background-color: #d69e2e;
+    color: #1a202c;
+    margin-top: 0;
+    text-shadow: none;
+}
+
+.btn-build:hover {
+    background-color: #b7791f;
+}
 /* МЕНЮ ДИСПЕТЧЕРА */
 .dispatcher-menu {
     background: rgba(43, 108, 176, 0.2);
@@ -296,4 +317,15 @@ body {
 }
 .game-over-reason {
     font-size: 24px; color: #cbd5e0; margin-bottom: 40px;
+}
+
+.game-over-overlay .action-button {
+    background-color: #48bb78;
+    color: #1a202c;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    text-shadow: none;
+}
+
+.game-over-overlay .action-button:hover {
+    background-color: #38a169;
 }
