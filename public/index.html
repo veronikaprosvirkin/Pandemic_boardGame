@@ -36,7 +36,7 @@
                 <p><strong>Дій:</strong> <span id="my-actions" class="text-orange actions-text">-</span></p>
                 
                 <div id="action-menu" class="cards-section">
-                    <select id="treat-color-select" class="trade-select is-hidden" style="margin-bottom: 5px;"></select>
+                    <select id="treat-color-select" class="trade-select is-hidden treat-color-select" title="Оберіть колір хвороби для лікування"></select>
                     
                     <button id="btn-treat" class="action-button is-hidden">
                         💊 Лікувати хворобу
@@ -98,9 +98,9 @@
 
     <!-- ЕКРАН ПЕРЕМОГИ / ПОРАЗКИ -->
     <div id="game-over-screen" class="game-over-overlay is-hidden">
-        <h1 id="game-over-title" class="game-over-title"></h1>
+        <h1 id="game-over-title" class="game-over-title">Кінець гри</h1>
         <p id="game-over-reason" class="game-over-reason"></p>
-        <button onclick="location.reload()" class="action-button" style="width: 200px;">Грати знову</button>
+        <button onclick="location.reload()" class="action-button replay-button">Грати знову</button>
     </div>
 
     <!-- КОНТЕЙНЕР ДЛЯ СПОВІЩЕНЬ -->
@@ -108,7 +108,7 @@
 
     <div id="event-modal" class="event-modal is-hidden">
         <div class="event-modal-content panel">
-            <h3 id="event-modal-title" class="event-modal-title"></h3>
+            <h3 id="event-modal-title" class="event-modal-title">Дія події</h3>
             <p id="event-modal-desc" class="event-modal-desc"></p>
             <div id="event-modal-body" class="event-modal-body"></div>
             <div class="event-modal-actions">

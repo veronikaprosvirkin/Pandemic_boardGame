@@ -38,6 +38,7 @@ const EVENT_CARDS = [
 ];
 
 let pendingEvent = null;
+const socketMap = {};
 
 function isCityCard(cardName) {
     return Boolean(cities[cardName]);
@@ -48,6 +49,32 @@ function removeCardFromHand(player, cardName) {
     if (index === -1) return false;
     player.cards.splice(index, 1);
     return true;
+}
+
+function getPlayerIdForSocket(socket) {
+    return socketMap[socket.id] || null;
+}
+
+function getPlayerForSocket(socket) {
+    const playerId = getPlayerIdForSocket(socket);
+    return {
+        playerId,
+        player: playerId ? gameState.players[playerId] || null : null
+    };
+}
+
+function bindSocketToPlayer(socket, playerId) {
+    socketMap[socket.id] = playerId;
+    if (gameState.players[playerId]) {
+        gameState.players[playerId].currentSocketId = socket.id;
+    }
+}
+
+function emitToPlayer(playerId, eventName, payload) {
+    const player = gameState.players[playerId];
+    if (player && player.currentSocketId) {
+        io.to(player.currentSocketId).emit(eventName, payload);
+    }
 }
 
 function ensureCityInfections(cityName) {
@@ -61,25 +88,57 @@ function ensureCityInfections(cityName) {
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
 
-    if (gameState.status === 'PLAYING') {
-        socket.emit('game_already_started');
-        return;
-    }
+    socket.on('register_player', (playerId) => {
+        if (!playerId) return;
 
-    gameState.players[socket.id] = {
-        id: socket.id,
-        isReady: false,
-        name: `Гравець ${Object.keys(gameState.players).length + 1}`,
-        role: null,
-        city: null,
-        cards: []
-    };
+        bindSocketToPlayer(socket, playerId);
 
-    io.emit('lobby_update', gameState.players);
+        const existingPlayer = gameState.players[playerId];
+
+        if (gameState.status === 'LOBBY') {
+            if (!existingPlayer) {
+                gameState.players[playerId] = {
+                    id: playerId,
+                    currentSocketId: socket.id,
+                    isReady: false,
+                    name: `Гравець ${Object.keys(gameState.players).length + 1}`,
+                    role: null,
+                    city: null,
+                    cards: []
+                };
+            } else {
+                existingPlayer.currentSocketId = socket.id;
+            }
+
+            io.emit('lobby_update', gameState.players);
+            return;
+        }
+
+        if (gameState.status === 'PLAYING') {
+            if (!existingPlayer) {
+                socket.emit('game_already_started');
+                return;
+            }
+
+            existingPlayer.currentSocketId = socket.id;
+            socket.emit('game_started', { cities, gameState });
+            socket.emit('state_update', gameState);
+            return;
+        }
+
+        if (existingPlayer) {
+            existingPlayer.currentSocketId = socket.id;
+            socket.emit('lobby_update', gameState.players);
+            return;
+        }
+
+        socket.emit('lobby_update', gameState.players);
+    });
 
     socket.on('player_ready', () => {
-        if (gameState.players[socket.id]) {
-            gameState.players[socket.id].isReady = true;
+        const { playerId, player } = getPlayerForSocket(socket);
+        if (playerId && player) {
+            gameState.players[playerId].isReady = true;
             io.emit('lobby_update', gameState.players);
             checkGameStart();
         }
@@ -230,413 +289,379 @@ io.on('connection', (socket) => {
         if (gameState.cured && gameState.cured[color]) {
             let medicHere = false;
             for (let p of Object.values(gameState.players)) {
-                if (p.role === "Медик" && p.city === cityName) medicHere = true;
-            }
-            if (medicHere) return; // Медик блокує інфекцію
-        }
+                // === ДІЇ ГРАВЦІВ ===
+                socket.on('move_player', (data) => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    const targetCity = typeof data === 'object' ? data.targetCity : data;
+                    const pawnId = typeof data === 'object' && data.pawnId ? data.pawnId : playerId;
+                    const discardCard = typeof data === 'object' ? data.discardCard : null;
+                    const specialFlight = typeof data === 'object' ? data.specialFlight === true : false;
 
-        const cityInfections = ensureCityInfections(cityName);
-        if (!cityInfections[color]) cityInfections[color] = 0;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (gameState.actionsLeft <= 0) return;
+                    if (pendingEvent && pendingEvent.playerId === playerId) return;
 
-        for (let i = 0; i < amount; i++) {
-            if (cityInfections[color] >= 3) {
-                // СПАЛАХ!
-                if (!outbrokenCities.has(cityName)) {
-                    gameState.outbreaks++;
-                    outbrokenCities.add(cityName);
-                    console.log(`💥 СПАЛАХ у місті ${cityName}!`);
-                    
-                    if (gameState.outbreaks >= 8) {
-                        triggerGameOver(false, 'СВІТ ЗАГИНУВ... Досягнуто критичний рівень (8 спалахів).');
+                    const isDispatcher = (player.role === "Диспетчер");
+                    if (pawnId !== playerId && !isDispatcher) return;
+
+                    const movingPlayer = gameState.players[pawnId];
+                    if (!movingPlayer) return;
+
+                    const currentCity = cities[movingPlayer.city];
+                    let moved = false;
+
+                    if (
+                        specialFlight &&
+                        player.role === "Інженер" &&
+                        movingPlayer.id === playerId &&
+                        gameState.researchStations.includes(movingPlayer.city) &&
+                        isCityCard(discardCard) &&
+                        player.cards.includes(discardCard) &&
+                        cities[targetCity]
+                    ) {
+                        removeCardFromHand(player, discardCard);
+                        moved = true;
+                    }
+
+                    if (!moved && currentCity && currentCity.connections.includes(targetCity)) {
+                        moved = true;
+                    } else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
+                        moved = true;
+                    } else if (!moved && player.cards.includes(targetCity)) {
+                        removeCardFromHand(player, targetCity);
+                        moved = true;
+                    } else if (!moved && player.cards.includes(movingPlayer.city)) {
+                        removeCardFromHand(player, movingPlayer.city);
+                        moved = true;
+                    } else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
+                        moved = true;
+                    }
+
+                    if (moved) {
+                        movingPlayer.city = targetCity;
+                        gameState.actionsLeft--;
+
+                        if (movingPlayer.role === "Медик") {
+                            const cityInfections = ensureCityInfections(movingPlayer.city);
+                            let removedAny = false;
+                            for (const [cubeColor, count] of Object.entries(cityInfections)) {
+                                if (count > 0 && gameState.cured && gameState.cured[cubeColor]) {
+                                    delete cityInfections[cubeColor];
+                                    removedAny = true;
+                                }
+                            }
+                            if (removedAny) {
+                                checkEradication();
+                            }
+                        }
+
+                        io.emit('state_update', gameState);
+                    }
+                });
+
+                socket.on('treat_disease', (data = {}) => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (gameState.actionsLeft <= 0) return;
+                    if (pendingEvent && pendingEvent.playerId === playerId) return;
+
+                    const city = player.city;
+                    const cityInfections = ensureCityInfections(city);
+                    const targetColor = data.targetColor;
+                    if (!targetColor || !cityInfections[targetColor] || cityInfections[targetColor] <= 0) return;
+
+                    if (player.role === "Медик" || (gameState.cured && gameState.cured[targetColor])) {
+                        cityInfections[targetColor] = 0;
+                    } else {
+                        cityInfections[targetColor] -= 1;
+                    }
+
+                    if (cityInfections[targetColor] <= 0) {
+                        delete cityInfections[targetColor];
+                    }
+
+                    gameState.actionsLeft--;
+                    checkEradication();
+                    io.emit('state_update', gameState);
+                });
+
+                socket.on('share_knowledge', ({ action, targetId, cardCity }) => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (gameState.actionsLeft <= 0) return;
+                    if (pendingEvent && pendingEvent.playerId === playerId) return;
+
+                    const p1 = player;
+                    const p2 = gameState.players[targetId];
+
+                    if (!p1 || !p2 || p1.city !== p2.city) return;
+
+                    if (action === 'give') {
+                        const idx = p1.cards.indexOf(cardCity);
+                        if (idx !== -1) {
+                            p1.cards.splice(idx, 1);
+                            p2.cards.push(cardCity);
+                            gameState.actionsLeft--;
+                        }
+                    } else if (action === 'take') {
+                        const idx = p2.cards.indexOf(cardCity);
+                        if (idx !== -1) {
+                            p2.cards.splice(idx, 1);
+                            p1.cards.push(cardCity);
+                            gameState.actionsLeft--;
+                        }
+                    }
+                    io.emit('state_update', gameState);
+                });
+
+                socket.on('play_event_card', (data) => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (pendingEvent && pendingEvent.playerId === playerId) return;
+
+                    const eventCard = typeof data === 'object' ? data.eventCard : data;
+                    const mode = typeof data === 'object' && data.mode ? data.mode : 'play';
+
+                    if (!player.cards.includes(eventCard)) return;
+
+                    if (mode === 'preview') {
+                        if (eventCard === 'EVENT_FORECAST') {
+                            const previewCards = [];
+                            for (let i = 0; i < 6 && infectionDeck.length > 0; i++) {
+                                previewCards.push(infectionDeck.pop());
+                            }
+
+                            if (previewCards.length === 0) return;
+
+                            removeCardFromHand(player, eventCard);
+                            pendingEvent = {
+                                playerId,
+                                eventCard,
+                                type: 'forecast',
+                                cards: previewCards
+                            };
+
+                            emitToPlayer(playerId, 'forecast_ready', { eventCard, cards: previewCards });
+                            io.emit('state_update', gameState);
+                            return;
+                        }
+
+                        if (eventCard === 'EVENT_RESILIENT_POPULATION') {
+                            if (!infectionDiscard || infectionDiscard.length === 0) return;
+
+                            removeCardFromHand(player, eventCard);
+                            pendingEvent = {
+                                playerId,
+                                eventCard,
+                                type: 'resilient_population'
+                            };
+
+                            emitToPlayer(playerId, 'resilient_population_ready', {
+                                eventCard,
+                                discardCards: [...infectionDiscard]
+                            });
+                            io.emit('state_update', gameState);
+                            return;
+                        }
+
                         return;
                     }
 
-                    // Ланцюгова реакція: по 1 кубику в усі сусідні міста!
-                    cities[cityName].connections.forEach(neighbor => {
-                        infectCity(neighbor, 1, outbrokenCities, color);
-                    });
-                }
-                break; // Більше кубиків у ЦЕ місто не кладемо
-            } else {
-                // Перевірка на ліміт кубиків (24)
-                if (getCubesCount(color) >= 24) {
-                    triggerGameOver(false, `СВІТ ЗАГИНУВ... Закінчилися кубики хвороби (колір: ${color}).`);
-                    return;
-                }
-                cityInfections[color]++;
-            }
-        }
-    }
-
-    // === ДІЇ ГРАВЦІВ ===
-    socket.on('move_player', (data) => {
-        const targetCity = typeof data === 'object' ? data.targetCity : data;
-        const pawnId = typeof data === 'object' && data.pawnId ? data.pawnId : socket.id;
-        const discardCard = typeof data === 'object' ? data.discardCard : null;
-        const specialFlight = typeof data === 'object' ? data.specialFlight === true : false;
-
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
-        if (gameState.actionsLeft <= 0) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
-
-        const player = gameState.players[socket.id];
-
-        const isDispatcher = (player.role === "Диспетчер");
-        if (pawnId !== socket.id && !isDispatcher) return; 
-
-        const movingPlayer = gameState.players[pawnId];
-        if (!movingPlayer) return;
-
-        const currentCity = cities[movingPlayer.city];
-        let moved = false;
-
-        if (
-            specialFlight &&
-            player.role === "Інженер" &&
-            movingPlayer.id === socket.id &&
-            gameState.researchStations.includes(movingPlayer.city) &&
-            isCityCard(discardCard) &&
-            player.cards.includes(discardCard) &&
-            cities[targetCity]
-        ) {
-            removeCardFromHand(player, discardCard);
-            moved = true;
-        }
-
-        if (!moved && currentCity && currentCity.connections.includes(targetCity)) {
-            moved = true;
-        }
-        else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
-            moved = true;
-        }
-        else if (!moved && player.cards.includes(targetCity)) {
-            removeCardFromHand(player, targetCity);
-            moved = true;
-        }
-        else if (!moved && player.cards.includes(movingPlayer.city)) {
-            removeCardFromHand(player, movingPlayer.city);
-            moved = true;
-        }
-        else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
-            moved = true;
-        }
-
-        if (moved) {
-            movingPlayer.city = targetCity;
-            gameState.actionsLeft--;
-
-            if (movingPlayer.role === "Медик") {
-                const cityInfections = ensureCityInfections(movingPlayer.city);
-                let removedAny = false;
-                for (const [cubeColor, count] of Object.entries(cityInfections)) {
-                    if (count > 0 && gameState.cured && gameState.cured[cubeColor]) {
-                        cityInfections[cubeColor] = 0;
-                        delete cityInfections[cubeColor];
-                        removedAny = true;
+                    if (eventCard === 'EVENT_ONE_QUIET_NIGHT') {
+                        removeCardFromHand(player, eventCard);
+                        gameState.quietNight = true;
+                        io.emit('state_update', gameState);
+                        return;
                     }
-                }
-                if (removedAny) {
-                    checkEradication(); // Перевіряємо, чи не знищив він щойно хворобу
-                }
-            }
-            io.emit('state_update', gameState); 
-        }
-    });
 
-    socket.on('treat_disease', (data = {}) => {
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
-        if (gameState.actionsLeft <= 0) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
+                    if (eventCard === 'EVENT_GOVERNMENT_GRANT') {
+                        const targetCity = typeof data === 'object' ? data.targetCity : null;
+                        if (!cities[targetCity]) return;
+                        if (gameState.researchStations.includes(targetCity)) return;
+                        if (gameState.researchStations.length >= 6) {
+                            socket.emit('max_stations_reached');
+                            return;
+                        }
 
-        const player = gameState.players[socket.id];
-        const city = player.city;
-        const cityInfections = ensureCityInfections(city);
+                        removeCardFromHand(player, eventCard);
+                        gameState.researchStations.push(targetCity);
+                        io.emit('state_update', gameState);
+                        return;
+                    }
 
-        const targetColor = data.targetColor;
-        if (!targetColor || !cityInfections[targetColor] || cityInfections[targetColor] <= 0) return;
+                    if (eventCard === 'EVENT_AIRLIFT') {
+                        const targetPlayerId = typeof data === 'object' ? data.targetPlayerId : null;
+                        const targetCity = typeof data === 'object' ? data.targetCity : null;
+                        const targetPlayer = gameState.players[targetPlayerId];
 
-        if (player.role === "Медик" || (gameState.cured && gameState.cured[targetColor])) {
-            cityInfections[targetColor] = 0;
-        } else {
-            cityInfections[targetColor] -= 1;
-        }
+                        if (!targetPlayer || !cities[targetCity]) return;
 
-        if (cityInfections[targetColor] <= 0) {
-            delete cityInfections[targetColor];
-        }
-
-        gameState.actionsLeft--;
-        checkEradication(); // Перевіряємо, чи ми не знищили останній кубик!
-        io.emit('state_update', gameState);
-    });
-
-    socket.on('share_knowledge', ({ action, targetId, cardCity }) => {
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
-        if (gameState.actionsLeft <= 0) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
-
-        const p1 = gameState.players[socket.id];
-        const p2 = gameState.players[targetId];
-        
-        if (!p1 || !p2 || p1.city !== p2.city) return;
-
-        if (action === 'give') {
-            const idx = p1.cards.indexOf(cardCity);
-            if (idx !== -1) {
-                p1.cards.splice(idx, 1);
-                p2.cards.push(cardCity);
-                gameState.actionsLeft--;
-            }
-        } else if (action === 'take') {
-            const idx = p2.cards.indexOf(cardCity);
-            if (idx !== -1) {
-                p2.cards.splice(idx, 1);
-                p1.cards.push(cardCity);
-                gameState.actionsLeft--;
-            }
-        }
-        io.emit('state_update', gameState);
-    });
-
-    socket.on('play_event_card', (data) => {
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
-
-        const eventCard = typeof data === 'object' ? data.eventCard : data;
-        const mode = typeof data === 'object' && data.mode ? data.mode : 'play';
-        const player = gameState.players[socket.id];
-
-        if (!player || !player.cards.includes(eventCard)) return;
-
-        if (mode === 'preview') {
-            if (eventCard === 'EVENT_FORECAST') {
-                const previewCards = [];
-                for (let i = 0; i < 6 && infectionDeck.length > 0; i++) {
-                    previewCards.push(infectionDeck.pop());
-                }
-
-                if (previewCards.length === 0) return;
-
-                removeCardFromHand(player, eventCard);
-                pendingEvent = {
-                    playerId: socket.id,
-                    eventCard,
-                    type: 'forecast',
-                    cards: previewCards
-                };
-
-                io.to(socket.id).emit('forecast_ready', { eventCard, cards: previewCards });
-                io.emit('state_update', gameState);
-                return;
-            }
-
-            if (eventCard === 'EVENT_RESILIENT_POPULATION') {
-                if (!infectionDiscard || infectionDiscard.length === 0) return;
-
-                removeCardFromHand(player, eventCard);
-                pendingEvent = {
-                    playerId: socket.id,
-                    eventCard,
-                    type: 'resilient_population'
-                };
-
-                io.to(socket.id).emit('resilient_population_ready', {
-                    eventCard,
-                    discardCards: [...infectionDiscard]
+                        removeCardFromHand(player, eventCard);
+                        targetPlayer.city = targetCity;
+                        io.emit('state_update', gameState);
+                        return;
+                    }
                 });
-                io.emit('state_update', gameState);
-                return;
-            }
 
-            return;
-        }
+                socket.on('resolve_event_card', (data) => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (!pendingEvent || pendingEvent.playerId !== playerId) return;
+                    if (!player) return;
 
-        if (eventCard === 'EVENT_ONE_QUIET_NIGHT') {
-            removeCardFromHand(player, eventCard);
-            gameState.quietNight = true;
-            io.emit('state_update', gameState);
-            return;
-        }
+                    if (pendingEvent.type === 'forecast') {
+                        const orderedCards = Array.isArray(data.orderedCards) ? data.orderedCards : [];
+                        if (orderedCards.length !== pendingEvent.cards.length) return;
 
-        if (eventCard === 'EVENT_GOVERNMENT_GRANT') {
-            const targetCity = typeof data === 'object' ? data.targetCity : null;
-            if (!cities[targetCity]) return;
-            if (gameState.researchStations.includes(targetCity)) return;
+                        const pendingSorted = [...pendingEvent.cards].sort().join('|');
+                        const orderedSorted = [...orderedCards].sort().join('|');
+                        if (pendingSorted !== orderedSorted) return;
+
+                        for (let i = orderedCards.length - 1; i >= 0; i--) {
+                            infectionDeck.push(orderedCards[i]);
+                        }
+                        pendingEvent = null;
+                        io.emit('state_update', gameState);
+                        return;
+                    }
+
+                    if (pendingEvent.type === 'resilient_population') {
+                        const selectedCard = data.selectedCard;
+                        const index = infectionDiscard.indexOf(selectedCard);
+                        if (index === -1) return;
+
+                        infectionDiscard.splice(index, 1);
+                        pendingEvent = null;
+                        io.emit('state_update', gameState);
+                        return;
+                    }
+                });
+
+                socket.on('cancel_pending_event', () => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (!pendingEvent || pendingEvent.playerId !== playerId) return;
+                    if (!player) return;
+
+                    player.cards.push(pendingEvent.eventCard);
+
+                    if (pendingEvent.type === 'forecast' && Array.isArray(pendingEvent.cards)) {
+                        for (let i = pendingEvent.cards.length - 1; i >= 0; i--) {
+                            infectionDeck.push(pendingEvent.cards[i]);
+                        }
+                    }
+
+                    pendingEvent = null;
+                    io.emit('state_update', gameState);
+                });
+
+                // === КІНЕЦЬ ХОДУ ТА ЕПІДЕМІЇ ===
+                socket.on('end_turn', () => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (pendingEvent && pendingEvent.playerId === playerId) return;
+
+                    if (!player.cards) player.cards = [];
+                    const drawnCards = [];
+                    let epidemicsDrawn = 0;
+
+                    for (let i = 0; i < 2; i++) {
+                        if (playerDeck.length > 0) {
+                            const card = playerDeck.pop();
+                            if (card === "ЕПІДЕМІЯ") {
+                                epidemicsDrawn++;
+                            } else {
+                                player.cards.push(card);
+                                drawnCards.push(card);
+                            }
+                        } else {
+                            triggerGameOver(false, 'СВІТ ЗАГИНУВ... У вас закінчився час (порожня колода гравців).');
+                            return;
+                        }
+                    }
+                    if (drawnCards.length > 0) emitToPlayer(playerId, 'cards_drawn', drawnCards);
+
+                    for (let e = 0; e < epidemicsDrawn; e++) {
+                        gameState.infectionRateIndex++;
+                        const rates = [2, 2, 2, 3, 3, 4, 4];
+                        gameState.infectionRate = rates[Math.min(gameState.infectionRateIndex, rates.length - 1)];
+
+                        if (infectionDeck.length > 0) {
+                            const bottomCity = infectionDeck.shift();
+                            infectionDiscard.push(bottomCity);
+
+                            infectCity(bottomCity, 3, new Set());
+                            io.emit('epidemic_alert', bottomCity);
+                        }
+
+                        for (let i = infectionDiscard.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [infectionDiscard[i], infectionDiscard[j]] = [infectionDiscard[j], infectionDiscard[i]];
+                        }
+                        infectionDeck = infectionDeck.concat(infectionDiscard);
+                        infectionDiscard = [];
+                    }
+
+                    const infectedCitiesThisTurn = [];
+                    if (gameState.quietNight) {
+                        gameState.quietNight = false;
+                        emitToPlayer(playerId, 'quiet_night_skipped');
+                    } else {
+                        for (let i = 0; i < gameState.infectionRate; i++) {
+                            if (infectionDeck.length > 0) {
+                                const infectedCity = infectionDeck.pop();
+                                infectionDiscard.push(infectedCity);
+                                infectCity(infectedCity, 1, new Set());
+                                infectedCitiesThisTurn.push(infectedCity);
+                            }
+                        }
+                    }
+
+                    if (infectedCitiesThisTurn.length > 0) {
+                        io.emit('infection_drawn', infectedCitiesThisTurn);
+                    }
+
+                    gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
+                    gameState.actionsLeft = 4;
+                    io.emit('state_update', gameState);
+                });
+
+    socket.on('build_station', () => {
+        const playerId = getPlayerIdForSocket(socket);
+        const player = playerId ? gameState.players[playerId] : null;
+        if (gameState.status !== 'PLAYING') return;
+        if (!playerId || !player) return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+        if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === playerId) return;
+
+        if (!gameState.researchStations.includes(player.city)) {
             if (gameState.researchStations.length >= 6) {
                 socket.emit('max_stations_reached');
                 return;
             }
 
-            removeCardFromHand(player, eventCard);
-            gameState.researchStations.push(targetCity);
-            io.emit('state_update', gameState);
-            return;
-        }
-
-        if (eventCard === 'EVENT_AIRLIFT') {
-            const targetPlayerId = typeof data === 'object' ? data.targetPlayerId : null;
-            const targetCity = typeof data === 'object' ? data.targetCity : null;
-            const targetPlayer = gameState.players[targetPlayerId];
-
-            if (!targetPlayer || !cities[targetCity]) return;
-
-            removeCardFromHand(player, eventCard);
-            targetPlayer.city = targetCity;
-            io.emit('state_update', gameState);
-            return;
-        }
-    });
-
-    socket.on('resolve_event_card', (data) => {
-        if (!pendingEvent || pendingEvent.playerId !== socket.id) return;
-
-        const player = gameState.players[socket.id];
-        if (!player) return;
-
-        if (pendingEvent.type === 'forecast') {
-            const orderedCards = Array.isArray(data.orderedCards) ? data.orderedCards : [];
-            if (orderedCards.length !== pendingEvent.cards.length) return;
-
-            const pendingSorted = [...pendingEvent.cards].sort().join('|');
-            const orderedSorted = [...orderedCards].sort().join('|');
-            if (pendingSorted !== orderedSorted) return;
-
-            for (let i = orderedCards.length - 1; i >= 0; i--) {
-                infectionDeck.push(orderedCards[i]);
-            }
-            pendingEvent = null;
-            io.emit('state_update', gameState);
-            return;
-        }
-
-        if (pendingEvent.type === 'resilient_population') {
-            const selectedCard = data.selectedCard;
-            const index = infectionDiscard.indexOf(selectedCard);
-            if (index === -1) return;
-
-            infectionDiscard.splice(index, 1);
-            pendingEvent = null;
-            io.emit('state_update', gameState);
-            return;
-        }
-    });
-
-    socket.on('cancel_pending_event', () => {
-        if (!pendingEvent || pendingEvent.playerId !== socket.id) return;
-
-        const player = gameState.players[socket.id];
-        if (!player) return;
-
-        player.cards.push(pendingEvent.eventCard);
-
-        if (pendingEvent.type === 'forecast' && Array.isArray(pendingEvent.cards)) {
-            for (let i = pendingEvent.cards.length - 1; i >= 0; i--) {
-                infectionDeck.push(pendingEvent.cards[i]);
-            }
-        }
-
-        pendingEvent = null;
-        io.emit('state_update', gameState);
-    });
-
-    // === КІНЕЦЬ ХОДУ ТА ЕПІДЕМІЇ ===
-    socket.on('end_turn', () => {
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
-            if (pendingEvent && pendingEvent.playerId === socket.id) return;
-
-            const player = gameState.players[socket.id];
-            if (!player.cards) player.cards = []; 
-            const drawnCards = [];
-            let epidemicsDrawn = 0;
-
-            for(let i = 0; i < 2; i++) {
-                if (playerDeck.length > 0) {
-                    const card = playerDeck.pop();
-                    if (card === "ЕПІДЕМІЯ") {
-                        epidemicsDrawn++;
-                    } else {
-                        player.cards.push(card);
-                        drawnCards.push(card);
-                    }
-                } else {
-                    triggerGameOver(false, 'СВІТ ЗАГИНУВ... У вас закінчився час (порожня колода гравців).');
-                    return;
-                }
-            }
-            if (drawnCards.length > 0) io.to(socket.id).emit('cards_drawn', drawnCards);
-
-            for (let e = 0; e < epidemicsDrawn; e++) {
-                gameState.infectionRateIndex++;
-                const rates = [2, 2, 2, 3, 3, 4, 4];
-                gameState.infectionRate = rates[Math.min(gameState.infectionRateIndex, rates.length - 1)];
-
-                if (infectionDeck.length > 0) {
-                    const bottomCity = infectionDeck.shift(); 
-                    infectionDiscard.push(bottomCity);
-                    
-                    // Використовуємо нову ідеальну функцію зараження (вона сама обробить Карантин, Спалахи і Знищення)
-                    infectCity(bottomCity, 3, new Set());
-                    io.emit('epidemic_alert', bottomCity);
-                }
-
-                for (let i = infectionDiscard.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [infectionDiscard[i], infectionDiscard[j]] = [infectionDiscard[j], infectionDiscard[i]];
-                }
-                infectionDeck = infectionDeck.concat(infectionDiscard); 
-                infectionDiscard = []; 
-            }
-
-            const infectedCitiesThisTurn = [];
-            if (gameState.quietNight) {
-                gameState.quietNight = false;
-                io.emit('quiet_night_skipped');
-            } else {
-                for (let i = 0; i < gameState.infectionRate; i++) {
-                    if (infectionDeck.length > 0) {
-                        const infectedCity = infectionDeck.pop();
-                        infectionDiscard.push(infectedCity);
-                        infectCity(infectedCity, 1, new Set());
-                        infectedCitiesThisTurn.push(infectedCity); 
-                    }
-                }
-            }
-            
-            if (infectedCitiesThisTurn.length > 0) {
-                io.emit('infection_drawn', infectedCitiesThisTurn);
-            }
-
-            gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
-            gameState.actionsLeft = 4;
-            io.emit('state_update', gameState);
-        }
-    });
-
-    socket.on('build_station', () => {
-        if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
-        if (gameState.actionsLeft <= 0) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
-
-        const player = gameState.players[socket.id];
-        
-        if (!gameState.researchStations.includes(player.city)) {
-            if (gameState.researchStations.length >= 6) {
-                socket.emit('max_stations_reached'); 
-                return; 
-            }
-
             let canBuild = false;
-            
+
             if (player.role === "Інженер") {
                 canBuild = true;
             } else if (player.cards.includes(player.city)) {
-                player.cards.splice(player.cards.indexOf(player.city), 1); 
+                player.cards.splice(player.cards.indexOf(player.city), 1);
                 canBuild = true;
             }
 
@@ -649,17 +674,19 @@ io.on('connection', (socket) => {
     });
 
     socket.on('discover_cure', () => {
+        const playerId = getPlayerIdForSocket(socket);
+        const player = playerId ? gameState.players[playerId] : null;
         if (gameState.status !== 'PLAYING') return;
-        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (!playerId || !player) return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
         if (gameState.actionsLeft <= 0) return;
-        if (pendingEvent && pendingEvent.playerId === socket.id) return;
+        if (pendingEvent && pendingEvent.playerId === playerId) return;
 
-        const player = gameState.players[socket.id];
         if (!gameState.researchStations.includes(player.city)) return;
 
-        const needed = player.role === "Вчений" ? 4 : 5; 
+        const needed = player.role === "Вчений" ? 4 : 5;
         const cardsByColor = {};
-        
+
         player.cards.forEach(card => {
             if (cities[card]) {
                 const color = cities[card].color;
@@ -673,7 +700,7 @@ io.on('connection', (socket) => {
         for (const [color, cityCards] of Object.entries(cardsByColor)) {
             if (cityCards.length >= needed && !gameState.cured[color]) {
                 gameState.cured[color] = true;
-                
+
                 for (let p of Object.values(gameState.players)) {
                     if (p.role === "Медик") {
                         const medicInfections = ensureCityInfections(p.city);
@@ -682,18 +709,17 @@ io.on('connection', (socket) => {
                         }
                     }
                 }
-                
+
                 for (let i = 0; i < needed; i++) {
                     const cardToRemove = cityCards[i];
                     player.cards.splice(player.cards.indexOf(cardToRemove), 1);
                 }
 
                 gameState.actionsLeft--;
-                checkEradication(); // Перевіряємо, чи немає кубиків цієї хвороби на полі
+                checkEradication();
                 io.emit('state_update', gameState);
-                io.emit('cure_discovered', color); 
-                
-                // ПЕРЕМОГА: ЗІБРАНО 4 ВАКЦИНИ
+                io.emit('cure_discovered', color);
+
                 if (Object.keys(gameState.cured).length >= 4) {
                     triggerGameOver(true, 'ЛЮДСТВО ВРЯТОВАНО! Винайдено всі 4 вакцини!');
                 }
@@ -703,7 +729,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('discard_card', (cardName) => {
-        const player = gameState.players[socket.id];
+        const playerId = getPlayerIdForSocket(socket);
+        const player = playerId ? gameState.players[playerId] : null;
         if (player && player.cards.length > 7) {
             const idx = player.cards.indexOf(cardName);
             if (idx !== -1) {
@@ -714,32 +741,23 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
+        const playerId = socketMap[socket.id];
         console.log(`Гравець відключився: ${socket.id}`);
+        if (!playerId) {
+            delete socketMap[socket.id];
+            return;
+        }
+
+        const player = gameState.players[playerId];
         if (gameState.status === 'LOBBY') {
-            delete gameState.players[socket.id];
+            delete gameState.players[playerId];
             io.emit('lobby_update', gameState.players);
-        } else {
-            const index = gameState.turnOrder.indexOf(socket.id);
-            if (index !== -1) {
-                gameState.turnOrder.splice(index, 1);
-                if (gameState.turnOrder.length === 0) {
-                    gameState.status = 'LOBBY'; 
-                    gameState.players = {};
-                    gameState.currentTurnIndex = 0;
-                } else if (index < gameState.currentTurnIndex) {
-                    gameState.currentTurnIndex--;
-                } else if (index === gameState.currentTurnIndex) {
-                    if (gameState.turnOrder.length > 0) {
-                        gameState.currentTurnIndex = gameState.currentTurnIndex % gameState.turnOrder.length;
-                    } else {
-                        gameState.currentTurnIndex = 0;
-                    }
-                    gameState.actionsLeft = 4;
-                }
-            }
-            delete gameState.players[socket.id];
+        } else if (player) {
+            player.currentSocketId = null;
             io.emit('state_update', gameState);
         }
+
+        delete socketMap[socket.id];
     });
 });
 

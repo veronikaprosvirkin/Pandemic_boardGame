@@ -1,4 +1,15 @@
+const playerIdKey = 'pandemic_playerId';
+let playerId = localStorage.getItem(playerIdKey);
+if (!playerId) {
+    playerId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(playerIdKey, playerId);
+}
+
 const socket = io();
+socket.emit('register_player', playerId);
+socket.on('connect', () => {
+    socket.emit('register_player', playerId);
+});
 
 const lobbyView = document.getElementById('lobby-view');
 const gameView = document.getElementById('game-view');
@@ -13,7 +24,7 @@ bgImage.src = 'map.png';
 
 let mapData = {};
 let currentGameState = {};
-let myPlayerId = null;
+let myPlayerId = playerId;
 
 let visualPlayers = {}; 
 let activeSelectionMode = null;
@@ -129,6 +140,13 @@ socket.on('lobby_update', (players) => {
              statusText.innerText = "Всі готові! Запускаємо гру...";
         }
     }
+
+    const myLobbyPlayer = players[myPlayerId];
+    if (myLobbyPlayer && myLobbyPlayer.isReady) {
+        btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
+        btnReady.style.backgroundColor = "#718096";
+        btnReady.disabled = true;
+    }
 });
 
 btnReady.addEventListener('click', () => {
@@ -143,7 +161,6 @@ socket.on('game_already_started', () => {
 });
 
 socket.on('game_started', (data) => {
-    myPlayerId = socket.id; 
     mapData = data.cities;
     currentGameState = data.gameState;
     
