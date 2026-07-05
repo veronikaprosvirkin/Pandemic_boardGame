@@ -36,6 +36,7 @@
                 <p><strong>Дій:</strong> <span id="my-actions" class="text-orange actions-text">-</span></p>
                 
                 <div id="action-menu" class="cards-section">
+                    <select id="treat-color-select" class="trade-select is-hidden" title="Оберіть колір хвороби для лікування"></select>
                     <button id="btn-treat" class="action-button is-hidden">
                         💊 Лікувати хворобу
                     </button>
@@ -49,19 +50,19 @@
                 
                 <div id="dispatcher-menu" class="cards-section dispatcher-menu is-hidden">
                     <p class="dispatcher-title">🚁 Пульт Диспетчера (Керування фішками):</p>
-                    <select id="dispatcher-select" class="trade-select"></select>
+                    <select id="dispatcher-select" class="trade-select" title="Оберіть фішку для переміщення"></select>
                 </div>
 
                 <div id="trade-menu" class="cards-section trade-menu is-hidden">
                     <p class="trade-title">🔄 Обмін картами:</p>
-                    <select id="trade-select" class="trade-select"></select>
+                    <select id="trade-select" class="trade-select" title="Оберіть обмін картами"></select>
                     <button id="btn-trade-confirm" class="action-button btn-trade">Підтвердити обмін</button>
                 </div>
 
                 <div id="engineer-flight-menu" class="cards-section engineer-flight-menu is-hidden">
                     <p class="engineer-flight-title">🛫 Особливий переліт Інженера:</p>
-                    <select id="engineer-flight-card-select" class="trade-select"></select>
-                    <select id="engineer-flight-city-select" class="trade-select"></select>
+                    <select id="engineer-flight-card-select" class="trade-select" title="Оберіть карту для скидання"></select>
+                    <select id="engineer-flight-city-select" class="trade-select" title="Оберіть місто для перельоту"></select>
                     <button id="btn-engineer-flight" class="action-button btn-engineer-flight">Перелетіти</button>
                 </div>
             </div>
