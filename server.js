@@ -123,6 +123,15 @@ io.on('connection', (socket) => {
             existingPlayer.currentSocketId = socket.id;
             socket.emit('game_started', { cities, gameState });
             socket.emit('state_update', gameState);
+
+            // НОВЕ: Відновлення вікна події, якщо гравець оновив сторінку!
+            if (pendingEvent && pendingEvent.playerId === playerId) {
+                if (pendingEvent.type === 'forecast') {
+                    socket.emit('forecast_ready', { eventCard: pendingEvent.eventCard, cards: pendingEvent.cards });
+                } else if (pendingEvent.type === 'resilient_population') {
+                    socket.emit('resilient_population_ready', { eventCard: pendingEvent.eventCard, discardCards: [...infectionDiscard] });
+                }
+            }
             return;
         }
 
@@ -620,7 +629,7 @@ io.on('connection', (socket) => {
                     const infectedCitiesThisTurn = [];
                     if (gameState.quietNight) {
                         gameState.quietNight = false;
-                        emitToPlayer(playerId, 'quiet_night_skipped');
+                        io.emit('quiet_night_skipped');
                     } else {
                         for (let i = 0; i < gameState.infectionRate; i++) {
                             if (infectionDeck.length > 0) {
