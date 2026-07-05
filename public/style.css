@@ -144,6 +144,12 @@ body {
     gap: 5px;
 }
 
+.event-cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .player-card {
     color: white;
     padding: 4px 8px;
@@ -152,6 +158,38 @@ body {
     font-weight: bold;
     text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
     border: 1px solid rgba(255,255,255,0.3);
+}
+
+.event-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 125px;
+    padding: 8px;
+    border-radius: 8px;
+    background: linear-gradient(145deg, #4a5568, #2d3748);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+}
+
+.event-card-title {
+    color: #f7fafc;
+    font-size: 0.8em;
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+.event-card-play {
+    background-color: #ed8936;
+    color: #1a202c;
+    margin-top: 0;
+    padding: 6px 8px;
+    font-size: 0.85em;
+    text-shadow: none;
+}
+
+.event-card-play:hover {
+    background-color: #dd6b20;
 }
 
 .no-cards-text {
@@ -189,12 +227,132 @@ body {
     background-color: #319795;
 }
 
+.btn-engineer-flight {
+    background-color: #3182ce;
+    color: white;
+}
+
+.btn-engineer-flight:hover {
+    background-color: #2b6cb0;
+}
+
+.engineer-flight-menu {
+    background: rgba(49, 130, 206, 0.16);
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    border: 1px solid #4299e1;
+}
+
+.engineer-flight-title {
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    color: #bee3f8;
+}
+
 .end-turn-btn {
     background-color: #e53e3e;
     padding: 10px;
     font-size: 1em;
 }
 .end-turn-btn:hover { background-color: #c53030; }
+
+.btn-cancel {
+    background-color: #718096;
+    color: white;
+}
+
+.btn-cancel:hover {
+    background-color: #4a5568;
+}
+
+.event-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.event-modal-content {
+    width: min(540px, calc(100vw - 32px));
+}
+
+.event-modal-title {
+    margin: 0 0 8px 0;
+}
+
+.event-modal-desc {
+    margin: 0 0 14px 0;
+    color: #cbd5e0;
+    line-height: 1.4;
+}
+
+.event-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.event-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.event-modal-actions .action-button {
+    flex: 1;
+    margin-top: 0;
+}
+
+.event-select {
+    width: 100%;
+    padding: 8px;
+    border-radius: 5px;
+    background: #2d3748;
+    color: white;
+    border: 1px solid #4a5568;
+}
+
+.forecast-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.forecast-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(26, 32, 44, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.forecast-item-title {
+    font-size: 0.95em;
+}
+
+.forecast-item-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.forecast-order-btn {
+    width: auto;
+    min-width: 36px;
+    padding: 6px 8px;
+    margin-top: 0;
+    background-color: #4a5568;
+}
+
+.forecast-order-btn:hover {
+    background-color: #2d3748;
+}
 
 /* =========================================
    СПЛИВАЮЧІ ПОВІДОМЛЕННЯ (NOTIFICATIONS)

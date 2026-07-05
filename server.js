@@ -20,7 +20,8 @@ let gameState = {
     infectionRateIndex: 0,
     infectionRate: 2,      
     outbreaks: 0,
-    infections: {} 
+    infections: {},
+    quietNight: false
 };
 
 let infectionDeck = [];
@@ -28,6 +29,26 @@ let infectionDiscard = [];
 let playerDeck = []; 
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину", "Інженер"];
+const EVENT_CARDS = [
+    'EVENT_ONE_QUIET_NIGHT',
+    'EVENT_GOVERNMENT_GRANT',
+    'EVENT_AIRLIFT',
+    'EVENT_RESILIENT_POPULATION',
+    'EVENT_FORECAST'
+];
+
+let pendingEvent = null;
+
+function isCityCard(cardName) {
+    return Boolean(cities[cardName]);
+}
+
+function removeCardFromHand(player, cardName) {
+    const index = player.cards.indexOf(cardName);
+    if (index === -1) return false;
+    player.cards.splice(index, 1);
+    return true;
+}
 
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
@@ -72,6 +93,8 @@ io.on('connection', (socket) => {
             gameState.researchStations = ["Atlanta"]; 
             gameState.cured = {}; 
             gameState.eradicated = {}; // НОВЕ: Знищені хвороби
+            gameState.quietNight = false;
+            pendingEvent = null;
 
             let availableRoles = [...roles];
             playersArr.forEach(p => {
@@ -105,7 +128,7 @@ io.on('connection', (socket) => {
             initialInfect(3, 2);
             initialInfect(3, 1);
 
-            let initialPlayerDeck = Object.keys(cities); 
+            let initialPlayerDeck = [...Object.keys(cities), ...EVENT_CARDS]; 
             for (let i = initialPlayerDeck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
@@ -240,10 +263,13 @@ io.on('connection', (socket) => {
     socket.on('move_player', (data) => {
         const targetCity = typeof data === 'object' ? data.targetCity : data;
         const pawnId = typeof data === 'object' && data.pawnId ? data.pawnId : socket.id;
+        const discardCard = typeof data === 'object' ? data.discardCard : null;
+        const specialFlight = typeof data === 'object' ? data.specialFlight === true : false;
 
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
         const player = gameState.players[socket.id];
 
@@ -256,21 +282,34 @@ io.on('connection', (socket) => {
         const currentCity = cities[movingPlayer.city];
         let moved = false;
 
-        if (currentCity && currentCity.connections.includes(targetCity)) {
+        if (
+            specialFlight &&
+            player.role === "Інженер" &&
+            movingPlayer.id === socket.id &&
+            gameState.researchStations.includes(movingPlayer.city) &&
+            isCityCard(discardCard) &&
+            player.cards.includes(discardCard) &&
+            cities[targetCity]
+        ) {
+            removeCardFromHand(player, discardCard);
             moved = true;
         }
-        else if (isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
+
+        if (!moved && currentCity && currentCity.connections.includes(targetCity)) {
             moved = true;
         }
-        else if (player.cards.includes(targetCity)) {
-            player.cards.splice(player.cards.indexOf(targetCity), 1);
+        else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
             moved = true;
         }
-        else if (player.cards.includes(movingPlayer.city)) {
-            player.cards.splice(player.cards.indexOf(movingPlayer.city), 1);
+        else if (!moved && player.cards.includes(targetCity)) {
+            removeCardFromHand(player, targetCity);
             moved = true;
         }
-        else if (gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
+        else if (!moved && player.cards.includes(movingPlayer.city)) {
+            removeCardFromHand(player, movingPlayer.city);
+            moved = true;
+        }
+        else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
             moved = true;
         }
 
@@ -293,6 +332,7 @@ io.on('connection', (socket) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
         const player = gameState.players[socket.id];
         const city = player.city;
@@ -314,6 +354,7 @@ io.on('connection', (socket) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
         const p1 = gameState.players[socket.id];
         const p2 = gameState.players[targetId];
@@ -338,10 +379,153 @@ io.on('connection', (socket) => {
         io.emit('state_update', gameState);
     });
 
+    socket.on('play_event_card', (data) => {
+        if (gameState.status !== 'PLAYING') return;
+        if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
+
+        const eventCard = typeof data === 'object' ? data.eventCard : data;
+        const mode = typeof data === 'object' && data.mode ? data.mode : 'play';
+        const player = gameState.players[socket.id];
+
+        if (!player || !player.cards.includes(eventCard)) return;
+
+        if (mode === 'preview') {
+            if (eventCard === 'EVENT_FORECAST') {
+                const previewCards = [];
+                for (let i = 0; i < 6 && infectionDeck.length > 0; i++) {
+                    previewCards.push(infectionDeck.pop());
+                }
+
+                if (previewCards.length === 0) return;
+
+                removeCardFromHand(player, eventCard);
+                pendingEvent = {
+                    playerId: socket.id,
+                    eventCard,
+                    type: 'forecast',
+                    cards: previewCards
+                };
+
+                io.to(socket.id).emit('forecast_ready', { eventCard, cards: previewCards });
+                io.emit('state_update', gameState);
+                return;
+            }
+
+            if (eventCard === 'EVENT_RESILIENT_POPULATION') {
+                if (!infectionDiscard || infectionDiscard.length === 0) return;
+
+                removeCardFromHand(player, eventCard);
+                pendingEvent = {
+                    playerId: socket.id,
+                    eventCard,
+                    type: 'resilient_population'
+                };
+
+                io.to(socket.id).emit('resilient_population_ready', {
+                    eventCard,
+                    discardCards: [...infectionDiscard]
+                });
+                io.emit('state_update', gameState);
+                return;
+            }
+
+            return;
+        }
+
+        if (eventCard === 'EVENT_ONE_QUIET_NIGHT') {
+            removeCardFromHand(player, eventCard);
+            gameState.quietNight = true;
+            io.emit('state_update', gameState);
+            return;
+        }
+
+        if (eventCard === 'EVENT_GOVERNMENT_GRANT') {
+            const targetCity = typeof data === 'object' ? data.targetCity : null;
+            if (!cities[targetCity]) return;
+            if (gameState.researchStations.includes(targetCity)) return;
+            if (gameState.researchStations.length >= 6) {
+                socket.emit('max_stations_reached');
+                return;
+            }
+
+            removeCardFromHand(player, eventCard);
+            gameState.researchStations.push(targetCity);
+            io.emit('state_update', gameState);
+            return;
+        }
+
+        if (eventCard === 'EVENT_AIRLIFT') {
+            const targetPlayerId = typeof data === 'object' ? data.targetPlayerId : null;
+            const targetCity = typeof data === 'object' ? data.targetCity : null;
+            const targetPlayer = gameState.players[targetPlayerId];
+
+            if (!targetPlayer || !cities[targetCity]) return;
+
+            removeCardFromHand(player, eventCard);
+            targetPlayer.city = targetCity;
+            io.emit('state_update', gameState);
+            return;
+        }
+    });
+
+    socket.on('resolve_event_card', (data) => {
+        if (!pendingEvent || pendingEvent.playerId !== socket.id) return;
+
+        const player = gameState.players[socket.id];
+        if (!player) return;
+
+        if (pendingEvent.type === 'forecast') {
+            const orderedCards = Array.isArray(data.orderedCards) ? data.orderedCards : [];
+            if (orderedCards.length !== pendingEvent.cards.length) return;
+
+            const pendingSorted = [...pendingEvent.cards].sort().join('|');
+            const orderedSorted = [...orderedCards].sort().join('|');
+            if (pendingSorted !== orderedSorted) return;
+
+            for (let i = orderedCards.length - 1; i >= 0; i--) {
+                infectionDeck.push(orderedCards[i]);
+            }
+            pendingEvent = null;
+            io.emit('state_update', gameState);
+            return;
+        }
+
+        if (pendingEvent.type === 'resilient_population') {
+            const selectedCard = data.selectedCard;
+            const index = infectionDiscard.indexOf(selectedCard);
+            if (index === -1) return;
+
+            infectionDiscard.splice(index, 1);
+            pendingEvent = null;
+            io.emit('state_update', gameState);
+            return;
+        }
+    });
+
+    socket.on('cancel_pending_event', () => {
+        if (!pendingEvent || pendingEvent.playerId !== socket.id) return;
+
+        const player = gameState.players[socket.id];
+        if (!player) return;
+
+        player.cards.push(pendingEvent.eventCard);
+
+        if (pendingEvent.type === 'forecast' && Array.isArray(pendingEvent.cards)) {
+            for (let i = pendingEvent.cards.length - 1; i >= 0; i--) {
+                infectionDeck.push(pendingEvent.cards[i]);
+            }
+        }
+
+        pendingEvent = null;
+        io.emit('state_update', gameState);
+    });
+
     // === КІНЕЦЬ ХОДУ ТА ЕПІДЕМІЇ ===
     socket.on('end_turn', () => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] === socket.id) {
+            if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
             const player = gameState.players[socket.id];
             if (!player.cards) player.cards = []; 
@@ -387,12 +571,17 @@ io.on('connection', (socket) => {
             }
 
             const infectedCitiesThisTurn = [];
-            for (let i = 0; i < gameState.infectionRate; i++) {
-                if (infectionDeck.length > 0) {
-                    const infectedCity = infectionDeck.pop();
-                    infectionDiscard.push(infectedCity);
-                    infectCity(infectedCity, 1, new Set());
-                    infectedCitiesThisTurn.push(infectedCity); 
+            if (gameState.quietNight) {
+                gameState.quietNight = false;
+                io.to(socket.id).emit('quiet_night_skipped');
+            } else {
+                for (let i = 0; i < gameState.infectionRate; i++) {
+                    if (infectionDeck.length > 0) {
+                        const infectedCity = infectionDeck.pop();
+                        infectionDiscard.push(infectedCity);
+                        infectCity(infectedCity, 1, new Set());
+                        infectedCitiesThisTurn.push(infectedCity); 
+                    }
                 }
             }
             
@@ -410,6 +599,7 @@ io.on('connection', (socket) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
         const player = gameState.players[socket.id];
         
@@ -440,6 +630,7 @@ io.on('connection', (socket) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
+        if (pendingEvent && pendingEvent.playerId === socket.id) return;
 
         const player = gameState.players[socket.id];
         if (!gameState.researchStations.includes(player.city)) return;

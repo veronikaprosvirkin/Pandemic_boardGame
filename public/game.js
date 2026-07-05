@@ -38,6 +38,37 @@ const roleDescriptions = {
     "Інженер": "🛠️ Може будувати дослідну станцію у своєму місті без карти."
 };
 
+const eventCardLabels = {
+    EVENT_ONE_QUIET_NIGHT: 'Подія: Тиха ніч',
+    EVENT_GOVERNMENT_GRANT: 'Подія: Урядовий грант',
+    EVENT_AIRLIFT: 'Подія: Повітряний міст',
+    EVENT_RESILIENT_POPULATION: 'Подія: Стійка популяція',
+    EVENT_FORECAST: 'Подія: Прогноз'
+};
+
+const eventCardDescriptions = {
+    EVENT_ONE_QUIET_NIGHT: 'Наступна фаза інфекції буде пропущена.',
+    EVENT_GOVERNMENT_GRANT: 'Побудуйте дослідницьку станцію у будь-якому місті.',
+    EVENT_AIRLIFT: 'Перемістіть будь-якого гравця у будь-яке місто.',
+    EVENT_RESILIENT_POPULATION: 'Назавжди приберіть 1 карту з discard infection.',
+    EVENT_FORECAST: 'Перегляньте 6 верхніх карт infection deck і змініть їх порядок.'
+};
+
+let activeEventModal = null;
+
+const eventCardsContainer = document.getElementById('event-cards-container');
+const engineerFlightMenu = document.getElementById('engineer-flight-menu');
+const engineerFlightCardSelect = document.getElementById('engineer-flight-card-select');
+const engineerFlightCitySelect = document.getElementById('engineer-flight-city-select');
+const btnEngineerFlight = document.getElementById('btn-engineer-flight');
+
+const eventModal = document.getElementById('event-modal');
+const eventModalTitle = document.getElementById('event-modal-title');
+const eventModalDesc = document.getElementById('event-modal-desc');
+const eventModalBody = document.getElementById('event-modal-body');
+const eventModalCancel = document.getElementById('event-modal-cancel');
+const eventModalConfirm = document.getElementById('event-modal-confirm');
+
 socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
     

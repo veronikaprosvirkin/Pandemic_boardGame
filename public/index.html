@@ -57,12 +57,26 @@
                     <select id="trade-select" class="trade-select"></select>
                     <button id="btn-trade-confirm" class="action-button btn-trade">Підтвердити обмін</button>
                 </div>
+
+                <div id="engineer-flight-menu" class="cards-section engineer-flight-menu is-hidden">
+                    <p class="engineer-flight-title">🛫 Особливий переліт Інженера:</p>
+                    <select id="engineer-flight-card-select" class="trade-select"></select>
+                    <select id="engineer-flight-city-select" class="trade-select"></select>
+                    <button id="btn-engineer-flight" class="action-button btn-engineer-flight">Перелетіти</button>
+                </div>
             </div>
 
             <div class="panel global-stats-panel">
                 <h3 id="turn-indicator" class="global-stats-title">Очікування...</h3>
                 <button id="end-turn-btn" class="action-button end-turn-btn is-hidden">Завершити хід</button>
                 
+                <div class="cards-section">
+                    <p class="bottom-cards-title"><strong>Картки подій:</strong></p>
+                    <div id="event-cards-container" class="event-cards-container">
+                        <span class="no-cards-text">Немає карт подій</span>
+                    </div>
+                </div>
+
                 <div class="cards-section">
                     <p class="bottom-cards-title"><strong>Ваші карти міст:</strong></p>
                     <div id="my-cards-container">
@@ -89,6 +103,18 @@
 
     <!-- КОНТЕЙНЕР ДЛЯ СПОВІЩЕНЬ -->
     <div id="notifications-container"></div>
+
+    <div id="event-modal" class="event-modal is-hidden">
+        <div class="event-modal-content panel">
+            <h3 id="event-modal-title" class="event-modal-title"></h3>
+            <p id="event-modal-desc" class="event-modal-desc"></p>
+            <div id="event-modal-body" class="event-modal-body"></div>
+            <div class="event-modal-actions">
+                <button id="event-modal-cancel" class="action-button btn-cancel">Скасувати</button>
+                <button id="event-modal-confirm" class="action-button btn-trade">Підтвердити</button>
+            </div>
+        </div>
+    </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
