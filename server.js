@@ -284,6 +284,7 @@ io.on('connection', (socket) => {
     }
 
     // ГОЛОВНИЙ ДВИГУН ЗАРАЖЕННЯ (З Ланцюговими спалахами)
+    // ГОЛОВНИЙ ДВИГУН ЗАРАЖЕННЯ (З Ланцюговими спалахами)
     function infectCity(cityName, amount, outbrokenCities = new Set(), diseaseColor = null) {
         if (gameState.status === 'GAME_OVER') return;
         if (!cities[cityName]) return;
@@ -298,8 +299,46 @@ io.on('connection', (socket) => {
         if (gameState.cured && gameState.cured[color]) {
             let medicHere = false;
             for (let p of Object.values(gameState.players)) {
-                // === ДІЇ ГРАВЦІВ ===
-                socket.on('move_player', (data) => {
+                if (p.role === "Медик" && p.city === cityName) medicHere = true;
+            }
+            if (medicHere) return; // Медик блокує інфекцію
+        }
+
+        const cityInfections = ensureCityInfections(cityName);
+        if (!cityInfections[color]) cityInfections[color] = 0;
+
+        for (let i = 0; i < amount; i++) {
+            if (cityInfections[color] >= 3) {
+                // СПАЛАХ!
+                if (!outbrokenCities.has(cityName)) {
+                    gameState.outbreaks++;
+                    outbrokenCities.add(cityName);
+                    console.log(`💥 СПАЛАХ у місті ${cityName}!`);
+                    
+                    if (gameState.outbreaks >= 8) {
+                        triggerGameOver(false, 'СВІТ ЗАГИНУВ... Досягнуто критичний рівень (8 спалахів).');
+                        return;
+                    }
+
+                    // Ланцюгова реакція: по 1 кубику в усі сусідні міста!
+                    cities[cityName].connections.forEach(neighbor => {
+                        infectCity(neighbor, 1, outbrokenCities, color);
+                    });
+                }
+                break; // Більше кубиків у ЦЕ місто не кладемо
+            } else {
+                // Перевірка на ліміт кубиків (24)
+                if (getCubesCount(color) >= 24) {
+                    triggerGameOver(false, `СВІТ ЗАГИНУВ... Закінчилися кубики хвороби (колір: ${color}).`);
+                    return;
+                }
+                cityInfections[color]++;
+            }
+        }
+    }
+
+    // === ДІЇ ГРАВЦІВ ===
+    socket.on('move_player', (data) => {
                     const playerId = getPlayerIdForSocket(socket);
                     const player = playerId ? gameState.players[playerId] : null;
                     const targetCity = typeof data === 'object' ? data.targetCity : data;

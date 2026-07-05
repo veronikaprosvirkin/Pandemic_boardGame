@@ -160,6 +160,8 @@ socket.on('game_already_started', () => {
     lobbyView.innerHTML = "<div class='panel lobby-panel'><h2 class='text-blue'>Гра вже почалася!</h2><p class='text-gray'>Ви не можете приєднатися зараз.</p></div>";
 });
 
+let isDrawLoopRunning = false;
+
 socket.on('game_started', (data) => {
     mapData = data.cities;
     currentGameState = data.gameState;
@@ -169,7 +171,10 @@ socket.on('game_started', (data) => {
     gameView.classList.add('game-view-active');
 
     updateUI();
-    draw(); 
+    if (!isDrawLoopRunning) {
+        isDrawLoopRunning = true;
+        draw(); 
+    }
 });
 
 socket.on('state_update', (newState) => {
