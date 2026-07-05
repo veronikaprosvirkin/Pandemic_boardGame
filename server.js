@@ -110,9 +110,13 @@ io.on('connection', (socket) => {
                 const j = Math.floor(Math.random() * (i + 1));
                 [initialPlayerDeck[i], initialPlayerDeck[j]] = [initialPlayerDeck[j], initialPlayerDeck[i]];
             }
+            
+            let initialCards = 2;
+            if (playersArr.length === 2) initialCards = 4;
+            if (playersArr.length === 3) initialCards = 3;
 
             playersArr.forEach(p => {
-                for(let i = 0; i < 2; i++) {
+                for(let i = 0; i < initialCards; i++) {
                     if(initialPlayerDeck.length > 0) p.cards.push(initialPlayerDeck.pop());
                 }
             });
@@ -189,6 +193,14 @@ io.on('connection', (socket) => {
 
         // Захист Карантину
         if (isQuarantined(cityName)) return;
+
+        if (gameState.cured && gameState.cured[color]) {
+            let medicHere = false;
+            for (let p of Object.values(gameState.players)) {
+                if (p.role === "Медик" && p.city === cityName) medicHere = true;
+            }
+            if (medicHere) return; // Медик блокує інфекцію
+        }
 
         if (gameState.infections[cityName] === undefined) {
             gameState.infections[cityName] = 0;
