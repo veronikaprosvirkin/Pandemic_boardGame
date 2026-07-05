@@ -878,3 +878,105 @@ socket.on('infection_drawn', (citiesList) => {
 socket.on('epidemic_alert', (city) => {
     showNotification(`⚠️ ЕПІДЕМІЯ В МІСТІ<br><strong>${city}</strong>!`, 'epidemic');
 });
+
+// ==========================================
+// ЛОГІКА КАРТ ПОДІЙ ТА ІНЖЕНЕРА
+// ==========================================
+
+if (btnEngineerFlight) {
+    btnEngineerFlight.addEventListener('click', () => {
+        const discard = engineerFlightCardSelect.value;
+        const target = engineerFlightCitySelect.value;
+        if (discard && target) {
+            socket.emit('move_player', { targetCity: target, pawnId: myPlayerId, discardCard: discard, specialFlight: true });
+        }
+    });
+}
+
+function handlePlayEventCard(cardId) {
+    if (cardId === 'EVENT_ONE_QUIET_NIGHT') {
+        socket.emit('play_event_card', cardId);
+    } else if (cardId === 'EVENT_GOVERNMENT_GRANT') {
+        let html = `<select id="modal-city-select" class="trade-select modal-select-full">`;
+        Object.keys(mapData).forEach(c => {
+            if (!currentGameState.researchStations.includes(c)) html += `<option value="${c}">${c}</option>`;
+        });
+        html += `</select>`;
+        openEventModal('Урядовий грант', 'Оберіть місто для безкоштовної станції:', html, cardId);
+    } else if (cardId === 'EVENT_AIRLIFT') {
+        let html = `<select id="modal-player-select" class="trade-select modal-select-full">`;
+        Object.values(currentGameState.players).forEach(p => html += `<option value="${p.id}">${p.role} (${p.city})</option>`);
+        html += `</select><select id="modal-airlift-city" class="trade-select modal-select-full">`;
+        Object.keys(mapData).forEach(c => html += `<option value="${c}">${c}</option>`);
+        html += `</select>`;
+        openEventModal('Повітряний міст', 'Оберіть кого і куди перемістити:', html, cardId);
+    } else if (cardId === 'EVENT_RESILIENT_POPULATION' || cardId === 'EVENT_FORECAST') {
+        socket.emit('play_event_card', { eventCard: cardId, mode: 'preview' });
+    }
+}
+
+function openEventModal(title, desc, bodyHtml, cardId) {
+    activeEventModal = cardId;
+    eventModalTitle.innerText = title;
+    eventModalDesc.innerText = desc;
+    eventModalBody.innerHTML = bodyHtml;
+    eventModal.classList.remove('is-hidden');
+}
+
+if (eventModalCancel) {
+    eventModalCancel.onclick = () => {
+        eventModal.classList.add('is-hidden');
+        if (activeEventModal === 'EVENT_RESILIENT_POPULATION' || activeEventModal === 'EVENT_FORECAST') socket.emit('cancel_pending_event');
+        activeEventModal = null;
+    };
+}
+
+if (eventModalConfirm) {
+    eventModalConfirm.onclick = () => {
+        if (activeEventModal === 'EVENT_GOVERNMENT_GRANT') {
+            socket.emit('play_event_card', { eventCard: activeEventModal, targetCity: document.getElementById('modal-city-select').value });
+        } else if (activeEventModal === 'EVENT_AIRLIFT') {
+            socket.emit('play_event_card', { eventCard: activeEventModal, targetPlayerId: document.getElementById('modal-player-select').value, targetCity: document.getElementById('modal-airlift-city').value });
+        } else if (activeEventModal === 'EVENT_RESILIENT_POPULATION') {
+            socket.emit('resolve_event_card', { selectedCard: document.getElementById('modal-resilient-select').value });
+        } else if (activeEventModal === 'EVENT_FORECAST') {
+            const items = document.querySelectorAll('.forecast-item');
+            const ordered = Array.from(items).map(el => el.getAttribute('data-card'));
+            socket.emit('resolve_event_card', { orderedCards: ordered });
+        }
+        eventModal.classList.add('is-hidden');
+        activeEventModal = null;
+    };
+}
+
+socket.on('resilient_population_ready', (data) => {
+    if (data.discardCards.length === 0) {
+        showNotification('Відбій інфекцій порожній!', 'error');
+        socket.emit('cancel_pending_event');
+        return;
+    }
+    let html = `<select id="modal-resilient-select" class="trade-select modal-select-full">`;
+    data.discardCards.forEach(c => html += `<option value="${c}">${c}</option>`);
+    html += `</select>`;
+    openEventModal('Стійка популяція', 'Оберіть карту для ВИДАЛЕННЯ з гри:', html, data.eventCard);
+});
+
+socket.on('forecast_ready', (data) => {
+    let html = `<p class="forecast-hint">(Верхня карта — перша у списку)</p>`;
+    html += `<ul class="forecast-list">`;
+    data.cards.forEach(c => {
+        html += `<li class="forecast-item" data-card="${c}">
+            <span>${c}</span>
+            <div class="forecast-controls">
+                <button class="btn-forecast-move" onclick="if(this.closest('li').previousElementSibling) this.closest('li').parentNode.insertBefore(this.closest('li'), this.closest('li').previousElementSibling)">⬆️</button>
+                <button class="btn-forecast-move" onclick="if(this.closest('li').nextElementSibling) this.closest('li').parentNode.insertBefore(this.closest('li').nextElementSibling, this.closest('li'))">⬇️</button>
+            </div>
+        </li>`;
+    });
+    html += `</ul>`;
+    openEventModal('Прогноз', 'Змініть порядок карт кнопками (Верхня випаде першою):', html, data.eventCard);
+});
+
+socket.on('quiet_night_skipped', () => {
+    showNotification(`🌙 ТИХА НІЧ! Інфекція цього ходу не поширюється.`, 'card', '#805ad5');
+});
