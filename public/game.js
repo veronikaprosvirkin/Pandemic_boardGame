@@ -190,7 +190,7 @@ function updateUI() {
                 cardEl.innerText = cardCity;
                 cardEl.className = 'player-card'; 
                 cardEl.style.backgroundColor = cityColor; 
-                if (isOverLimit && currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId) {
+                if (isOverLimit) {
                     cardEl.style.cursor = "pointer";
                     cardEl.style.border = "2px solid #e53e3e"; 
                     cardEl.onclick = () => socket.emit('discard_card', cardCity);

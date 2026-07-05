@@ -595,7 +595,7 @@ io.on('connection', (socket) => {
             const infectedCitiesThisTurn = [];
             if (gameState.quietNight) {
                 gameState.quietNight = false;
-                io.to(socket.id).emit('quiet_night_skipped');
+                io.emit('quiet_night_skipped');
             } else {
                 for (let i = 0; i < gameState.infectionRate; i++) {
                     if (infectionDeck.length > 0) {
@@ -673,6 +673,15 @@ io.on('connection', (socket) => {
         for (const [color, cityCards] of Object.entries(cardsByColor)) {
             if (cityCards.length >= needed && !gameState.cured[color]) {
                 gameState.cured[color] = true;
+                
+                for (let p of Object.values(gameState.players)) {
+                    if (p.role === "Медик") {
+                        const medicInfections = ensureCityInfections(p.city);
+                        if (medicInfections[color] > 0) {
+                            delete medicInfections[color];
+                        }
+                    }
+                }
                 
                 for (let i = 0; i < needed; i++) {
                     const cardToRemove = cityCards[i];
