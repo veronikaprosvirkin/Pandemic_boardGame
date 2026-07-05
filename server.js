@@ -50,6 +50,14 @@ function removeCardFromHand(player, cardName) {
     return true;
 }
 
+function ensureCityInfections(cityName) {
+    const value = gameState.infections[cityName];
+    if (!value || typeof value !== 'object') {
+        gameState.infections[cityName] = {};
+    }
+    return gameState.infections[cityName];
+}
+
 io.on('connection', (socket) => {
     console.log(`Гравець підключився: ${socket.id}`);
 
@@ -118,7 +126,9 @@ io.on('connection', (socket) => {
                 for (let i = 0; i < amountOfCities; i++) {
                     if (infectionDeck.length > 0) {
                         const city = infectionDeck.pop();
-                        gameState.infections[city] = cubesToPlace;
+                        const nativeColor = cities[city].color;
+                        const cityInfections = ensureCityInfections(city);
+                        cityInfections[nativeColor] = (cityInfections[nativeColor] || 0) + cubesToPlace;
                         infectionDiscard.push(city);
                     }
                 }
@@ -185,9 +195,9 @@ io.on('connection', (socket) => {
 
     function getCubesCount(color) {
         let count = 0;
-        for (let city in gameState.infections) {
-            if (cities[city] && cities[city].color === color) {
-                count += gameState.infections[city];
+        for (const cityInfections of Object.values(gameState.infections)) {
+            if (cityInfections && typeof cityInfections === 'object') {
+                count += cityInfections[color] || 0;
             }
         }
         return count;
@@ -206,10 +216,10 @@ io.on('connection', (socket) => {
     }
 
     // ГОЛОВНИЙ ДВИГУН ЗАРАЖЕННЯ (З Ланцюговими спалахами)
-    function infectCity(cityName, amount, outbrokenCities = new Set()) {
+    function infectCity(cityName, amount, outbrokenCities = new Set(), diseaseColor = null) {
         if (gameState.status === 'GAME_OVER') return;
         if (!cities[cityName]) return;
-        const color = cities[cityName].color;
+        const color = diseaseColor || cities[cityName].color;
 
         // Якщо хворобу повністю знищено - ігноруємо зараження!
         if (gameState.eradicated && gameState.eradicated[color]) return;
@@ -225,12 +235,11 @@ io.on('connection', (socket) => {
             if (medicHere) return; // Медик блокує інфекцію
         }
 
-        if (gameState.infections[cityName] === undefined) {
-            gameState.infections[cityName] = 0;
-        }
+        const cityInfections = ensureCityInfections(cityName);
+        if (!cityInfections[color]) cityInfections[color] = 0;
 
         for (let i = 0; i < amount; i++) {
-            if (gameState.infections[cityName] >= 3) {
+            if (cityInfections[color] >= 3) {
                 // СПАЛАХ!
                 if (!outbrokenCities.has(cityName)) {
                     gameState.outbreaks++;
@@ -244,7 +253,7 @@ io.on('connection', (socket) => {
 
                     // Ланцюгова реакція: по 1 кубику в усі сусідні міста!
                     cities[cityName].connections.forEach(neighbor => {
-                        infectCity(neighbor, 1, outbrokenCities);
+                        infectCity(neighbor, 1, outbrokenCities, color);
                     });
                 }
                 break; // Більше кубиків у ЦЕ місто не кладемо
@@ -254,7 +263,7 @@ io.on('connection', (socket) => {
                     triggerGameOver(false, `СВІТ ЗАГИНУВ... Закінчилися кубики хвороби (колір: ${color}).`);
                     return;
                 }
-                gameState.infections[cityName]++;
+                cityInfections[color]++;
             }
         }
     }
@@ -318,9 +327,16 @@ io.on('connection', (socket) => {
             gameState.actionsLeft--;
 
             if (movingPlayer.role === "Медик") {
-                const cityColor = cities[movingPlayer.city].color;
-                if (gameState.cured && gameState.cured[cityColor]) {
-                    gameState.infections[movingPlayer.city] = 0;
+                const cityInfections = ensureCityInfections(movingPlayer.city);
+                let removedAny = false;
+                for (const [cubeColor, count] of Object.entries(cityInfections)) {
+                    if (count > 0 && gameState.cured && gameState.cured[cubeColor]) {
+                        cityInfections[cubeColor] = 0;
+                        delete cityInfections[cubeColor];
+                        removedAny = true;
+                    }
+                }
+                if (removedAny) {
                     checkEradication(); // Перевіряємо, чи не знищив він щойно хворобу
                 }
             }
@@ -328,7 +344,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('treat_disease', () => {
+    socket.on('treat_disease', (data = {}) => {
         if (gameState.status !== 'PLAYING') return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== socket.id) return;
         if (gameState.actionsLeft <= 0) return;
@@ -336,18 +352,24 @@ io.on('connection', (socket) => {
 
         const player = gameState.players[socket.id];
         const city = player.city;
-        const cityColor = cities[city].color;
+        const cityInfections = ensureCityInfections(city);
 
-        if (gameState.infections[city] && gameState.infections[city] > 0) {
-            if (player.role === "Медик" || (gameState.cured && gameState.cured[cityColor])) {
-                gameState.infections[city] = 0;
-            } else {
-                gameState.infections[city] -= 1;
-            }
-            gameState.actionsLeft--;
-            checkEradication(); // Перевіряємо, чи ми не знищили останній кубик!
-            io.emit('state_update', gameState);
+        const targetColor = data.targetColor;
+        if (!targetColor || !cityInfections[targetColor] || cityInfections[targetColor] <= 0) return;
+
+        if (player.role === "Медик" || (gameState.cured && gameState.cured[targetColor])) {
+            cityInfections[targetColor] = 0;
+        } else {
+            cityInfections[targetColor] -= 1;
         }
+
+        if (cityInfections[targetColor] <= 0) {
+            delete cityInfections[targetColor];
+        }
+
+        gameState.actionsLeft--;
+        checkEradication(); // Перевіряємо, чи ми не знищили останній кубик!
+        io.emit('state_update', gameState);
     });
 
     socket.on('share_knowledge', ({ action, targetId, cardCity }) => {

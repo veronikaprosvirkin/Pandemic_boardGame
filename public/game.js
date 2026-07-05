@@ -29,6 +29,36 @@ function getCoords(originalX, originalY) {
     };
 }
 
+function getCityInfectionEntries(cityName) {
+    if (!currentGameState.infections || !currentGameState.infections[cityName]) return [];
+
+    const raw = currentGameState.infections[cityName];
+    if (typeof raw === 'number') {
+        const nativeColor = mapData[cityName] ? mapData[cityName].color : null;
+        if (!nativeColor || raw <= 0) return [];
+        return [[nativeColor, raw]];
+    }
+
+    if (typeof raw !== 'object') return [];
+
+    return Object.entries(raw).filter(([, count]) => count > 0);
+}
+
+function hasAnyInfections(cityName) {
+    return getCityInfectionEntries(cityName).length > 0;
+}
+
+function colorLabel(hexColor) {
+    const labels = {
+        '#2b6cb0': 'Синя',
+        '#d69e2e': 'Жовта',
+        '#e53e3e': 'Червона',
+        '#1a202c': 'Чорна',
+        '#000000': 'Чорна'
+    };
+    return labels[hexColor] || hexColor;
+}
+
 const roleDescriptions = {
     "Медик": "💊 Виліковує всі кубики хвороби одного кольору за 1 дію.",
     "Вчений": "🔬 Для винайдення ліків потрібно лише 4 карти.",
@@ -68,6 +98,7 @@ const eventModalDesc = document.getElementById('event-modal-desc');
 const eventModalBody = document.getElementById('event-modal-body');
 const eventModalCancel = document.getElementById('event-modal-cancel');
 const eventModalConfirm = document.getElementById('event-modal-confirm');
+const treatColorSelect = document.getElementById('treat-color-select');
 
 socket.on('lobby_update', (players) => {
     lobbyPlayersList.innerHTML = '';
@@ -238,6 +269,10 @@ function updateUI() {
                 actionsSpan.style.color = "#e53e3e";
                 endTurnBtn.classList.add('is-hidden');
                 if (btnTreat) btnTreat.classList.add('is-hidden');
+                if (treatColorSelect) {
+                    treatColorSelect.classList.add('is-hidden');
+                    treatColorSelect.innerHTML = '';
+                }
                 if (btnBuild) btnBuild.classList.add('is-hidden');
                 if (btnCure) btnCure.classList.add('is-hidden'); 
                 if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
@@ -248,13 +283,38 @@ function updateUI() {
                 endTurnBtn.classList.remove('is-hidden');
 
                 // 1. ЛІКУВАННЯ
-                if (currentGameState.infections && currentGameState.infections[me.city] > 0) {
+                const treatEntries = getCityInfectionEntries(me.city);
+                if (treatEntries.length > 0) {
                     btnTreat.classList.remove('is-hidden');
-                    const cityColor = mapData[me.city] ? mapData[me.city].color : null;
-                    const isCured = currentGameState.cured && currentGameState.cured[cityColor];
-                    btnTreat.innerText = (me.role === "Медик" || isCured) ? "💊 Вилікувати ВСІ кубики" : "💊 Вилікувати 1 кубик";
+
+                    if (treatColorSelect) {
+                        const previous = treatColorSelect.value;
+                        treatColorSelect.innerHTML = '';
+                        treatEntries.forEach(([hexColor, count]) => {
+                            const option = document.createElement('option');
+                            option.value = hexColor;
+                            option.textContent = `${colorLabel(hexColor)} (${count})`;
+                            treatColorSelect.appendChild(option);
+                        });
+
+                        if (previous && treatEntries.some(([hexColor]) => hexColor === previous)) {
+                            treatColorSelect.value = previous;
+                        }
+
+                        treatColorSelect.classList.remove('is-hidden');
+
+                        const selectedColor = treatColorSelect.value || treatEntries[0][0];
+                        const isCuredSelected = currentGameState.cured && currentGameState.cured[selectedColor];
+                        btnTreat.innerText = (me.role === "Медик" || isCuredSelected)
+                            ? "💊 Вилікувати ВСІ кубики вибраного кольору"
+                            : "💊 Вилікувати 1 кубик вибраного кольору";
+                    }
                 } else {
                     btnTreat.classList.add('is-hidden');
+                    if (treatColorSelect) {
+                        treatColorSelect.classList.add('is-hidden');
+                        treatColorSelect.innerHTML = '';
+                    }
                 }
                 
                 // 2. БУДІВНИЦТВО
@@ -377,6 +437,10 @@ function updateUI() {
             
             endTurnBtn.classList.add('is-hidden');
             if (btnTreat) btnTreat.classList.add('is-hidden');
+            if (treatColorSelect) {
+                treatColorSelect.classList.add('is-hidden');
+                treatColorSelect.innerHTML = '';
+            }
             if (btnBuild) btnBuild.classList.add('is-hidden');
             if (btnCure) btnCure.classList.add('is-hidden'); 
             if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
@@ -551,35 +615,42 @@ function draw() {
     }
 
     if (currentGameState.infections) {
-        for (const [cityName, count] of Object.entries(currentGameState.infections)) {
-            if (count > 0 && mapData[cityName]) {
-                const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
-                const cubeColor = mapData[cityName].color;
-                const cubeSize = 12;
-                const padding = 2;
-                const totalWidth = (count * cubeSize) + ((count - 1) * padding);
-                
-                const startX = pos.x - (totalWidth / 2);
-                const cy = pos.y + 16; 
+        for (const cityName of Object.keys(currentGameState.infections)) {
+            if (!mapData[cityName]) continue;
 
+            const cubesByColor = getCityInfectionEntries(cityName);
+            if (cubesByColor.length === 0) continue;
+
+            const totalCubeCount = cubesByColor.reduce((sum, [, count]) => sum + count, 0);
+            const pos = getCoords(mapData[cityName].x, mapData[cityName].y);
+            const cubeSize = 12;
+            const padding = 2;
+            const totalWidth = (totalCubeCount * cubeSize) + ((totalCubeCount - 1) * padding);
+
+            const startX = pos.x - (totalWidth / 2);
+            const cy = pos.y + 16;
+            let offset = 0;
+
+            for (const [cubeColor, count] of cubesByColor) {
                 for (let i = 0; i < count; i++) {
-                    const cx = startX + (i * (cubeSize + padding));
-                    
-                    ctx.shadowColor = cubeColor === "#000000" ? "#a0aec0" : cubeColor; 
-                    ctx.shadowBlur = 4 + (10 * pulse); 
+                    const cx = startX + (offset * (cubeSize + padding));
+
+                    ctx.shadowColor = cubeColor === "#000000" ? "#a0aec0" : cubeColor;
+                    ctx.shadowBlur = 4 + (10 * pulse);
                     ctx.shadowOffsetX = 0;
                     ctx.shadowOffsetY = 0;
 
-                    ctx.globalAlpha = 0.7 + (0.3 * pulse); 
+                    ctx.globalAlpha = 0.7 + (0.3 * pulse);
                     ctx.fillStyle = cubeColor;
                     ctx.fillRect(cx, cy, cubeSize, cubeSize);
-                    
-                    ctx.globalAlpha = 1.0; 
+
+                    ctx.globalAlpha = 1.0;
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
                     ctx.lineWidth = 2;
                     ctx.strokeRect(cx, cy, cubeSize, cubeSize);
 
-                    ctx.shadowBlur = 0; 
+                    ctx.shadowBlur = 0;
+                    offset++;
                 }
             }
         }
@@ -681,7 +752,11 @@ if (btnTradeConfirm) {
 const btnTreat = document.getElementById('btn-treat');
 if (btnTreat) {
     btnTreat.addEventListener('click', () => {
-        socket.emit('treat_disease');
+        const selectedColor = treatColorSelect && !treatColorSelect.classList.contains('is-hidden')
+            ? treatColorSelect.value
+            : null;
+        if (!selectedColor) return;
+        socket.emit('treat_disease', { targetColor: selectedColor });
     });
 }
 
