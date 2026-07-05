@@ -660,10 +660,12 @@ io.on('connection', (socket) => {
         const needed = player.role === "Вчений" ? 4 : 5; 
         const cardsByColor = {};
         
-        player.cards.forEach(city => {
-            const color = cities[city].color;
-            if (!cardsByColor[color]) cardsByColor[color] = [];
-            cardsByColor[color].push(city);
+        player.cards.forEach(card => {
+            if (cities[card]) {
+                const color = cities[card].color;
+                if (!cardsByColor[color]) cardsByColor[color] = [];
+                cardsByColor[color].push(card);
+            }
         });
 
         if (!gameState.cured) gameState.cured = {};

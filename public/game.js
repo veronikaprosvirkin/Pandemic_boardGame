@@ -16,6 +16,7 @@ let currentGameState = {};
 let myPlayerId = null;
 
 let visualPlayers = {}; 
+let activeSelectionMode = null;
 
 const SCALE_X = 1.0;
 const SCALE_Y = 1.0;
@@ -212,7 +213,7 @@ function updateUI() {
                 if (currentGameState.status === 'PLAYING') {
                     const btnPlay = document.createElement('button');
                     btnPlay.innerText = "Зіграти";
-                    btnPlay.className = "action-button";
+                    btnPlay.className = "action-button event-card-play";
                     btnPlay.style.marginTop = "5px";
                     btnPlay.style.padding = "4px";
                     btnPlay.style.fontSize = "11px";
@@ -777,29 +778,49 @@ if (btnBuild) {
 canvas.addEventListener('click', (e) => {
     if (currentGameState.status !== 'PLAYING') return;
 
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+    // Спочатку знаходимо, по якому місту клікнули
+    let clickedCity = null;
+    for (const [cityName, cityData] of Object.entries(mapData)) {
+        const pos = getCoords(cityData.x, cityData.y);
+        const dist = Math.hypot(x - pos.x, y - pos.y);
+        if (dist < 20) {
+            clickedCity = cityName;
+            break;
+        }
+    }
+
+    if (!clickedCity) return;
+
+    // --- НОВА ЛОГІКА ДЛЯ КАРТ ПОДІЙ ---
+    if (activeSelectionMode) {
+        if (activeSelectionMode.type === 'GOVERNMENT_GRANT') {
+            socket.emit('play_event_card', { eventCard: activeSelectionMode.cardId, targetCity: clickedCity });
+        } else if (activeSelectionMode.type === 'AIRLIFT') {
+            socket.emit('play_event_card', { eventCard: activeSelectionMode.cardId, targetPlayerId: activeSelectionMode.targetPlayerId, targetCity: clickedCity });
+        }
+        activeSelectionMode = null; // Вимикаємо "приціл"
+        return; // Зупиняємо клік, щоб фішка випадково не пішла туди пішки
+    }
+    // ----------------------------------
+
+    // --- СТАРА ЛОГІКА РУХУ ФІШОК ---
     const activePlayerId = currentGameState.turnOrder[currentGameState.currentTurnIndex];
     if (activePlayerId !== myPlayerId) return; 
     if (currentGameState.actionsLeft <= 0) return; 
     
     const me = currentGameState.players[myPlayerId];
-
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
-
-    for (const [cityName, cityData] of Object.entries(mapData)) {
-        const pos = getCoords(cityData.x, cityData.y);
-        const dist = Math.hypot(x - pos.x, y - pos.y);
-        if (dist < 20) {
-            let targetPawnId = myPlayerId;
-            if (me.role === "Диспетчер") {
-                const sel = document.getElementById('dispatcher-select');
-                if (sel) targetPawnId = sel.value;
-            }
-            socket.emit('move_player', { targetCity: cityName, pawnId: targetPawnId });
-            break;
-        }
+    let targetPawnId = myPlayerId;
+    
+    if (me.role === "Диспетчер") {
+        const sel = document.getElementById('dispatcher-select');
+        if (sel) targetPawnId = sel.value;
     }
+    
+    socket.emit('move_player', { targetCity: clickedCity, pawnId: targetPawnId });
 });
 
 // КІНЕЦЬ ГРИ ТА СПОВІЩЕННЯ
@@ -897,19 +918,14 @@ function handlePlayEventCard(cardId) {
     if (cardId === 'EVENT_ONE_QUIET_NIGHT') {
         socket.emit('play_event_card', cardId);
     } else if (cardId === 'EVENT_GOVERNMENT_GRANT') {
-        let html = `<select id="modal-city-select" class="trade-select modal-select-full">`;
-        Object.keys(mapData).forEach(c => {
-            if (!currentGameState.researchStations.includes(c)) html += `<option value="${c}">${c}</option>`;
-        });
-        html += `</select>`;
-        openEventModal('Урядовий грант', 'Оберіть місто для безкоштовної станції:', html, cardId);
+        // Замість списку вмикаємо режим кліку по мапі
+        activeSelectionMode = { type: 'GOVERNMENT_GRANT', cardId: cardId };
+        showNotification('📍 Клікніть на будь-яке місто на карті, щоб побудувати там станцію.', 'card', '#d69e2e');
     } else if (cardId === 'EVENT_AIRLIFT') {
         let html = `<select id="modal-player-select" class="trade-select modal-select-full">`;
         Object.values(currentGameState.players).forEach(p => html += `<option value="${p.id}">${p.role} (${p.city})</option>`);
-        html += `</select><select id="modal-airlift-city" class="trade-select modal-select-full">`;
-        Object.keys(mapData).forEach(c => html += `<option value="${c}">${c}</option>`);
         html += `</select>`;
-        openEventModal('Повітряний міст', 'Оберіть кого і куди перемістити:', html, cardId);
+        openEventModal('Повітряний міст', 'Оберіть гравця для переміщення, натисніть "Підтвердити", а ПОТІМ клікніть на місто на карті:', html, cardId);
     } else if (cardId === 'EVENT_RESILIENT_POPULATION' || cardId === 'EVENT_FORECAST') {
         socket.emit('play_event_card', { eventCard: cardId, mode: 'preview' });
     }
@@ -933,10 +949,11 @@ if (eventModalCancel) {
 
 if (eventModalConfirm) {
     eventModalConfirm.onclick = () => {
-        if (activeEventModal === 'EVENT_GOVERNMENT_GRANT') {
-            socket.emit('play_event_card', { eventCard: activeEventModal, targetCity: document.getElementById('modal-city-select').value });
-        } else if (activeEventModal === 'EVENT_AIRLIFT') {
-            socket.emit('play_event_card', { eventCard: activeEventModal, targetPlayerId: document.getElementById('modal-player-select').value, targetCity: document.getElementById('modal-airlift-city').value });
+        if (activeEventModal === 'EVENT_AIRLIFT') {
+            const selectedPlayerId = document.getElementById('modal-player-select').value;
+            activeSelectionMode = { type: 'AIRLIFT', cardId: activeEventModal, targetPlayerId: selectedPlayerId };
+            showNotification('🚁 Тепер клікніть на карті місто, куди хочете перемістити гравця.', 'card', '#3182ce');
+        } else if (activeEventModal === 'EVENT_GOVERNMENT_GRANT') {
         } else if (activeEventModal === 'EVENT_RESILIENT_POPULATION') {
             socket.emit('resolve_event_card', { selectedCard: document.getElementById('modal-resilient-select').value });
         } else if (activeEventModal === 'EVENT_FORECAST') {
