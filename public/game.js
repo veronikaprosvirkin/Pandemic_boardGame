@@ -858,7 +858,7 @@ function showNotification(message, type = 'card', cityColor = null) {
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
-    }, 4000);
+    }, 7000);
 }
 
 socket.on('cards_drawn', (cards) => {
