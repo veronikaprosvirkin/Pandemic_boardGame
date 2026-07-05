@@ -140,17 +140,24 @@ function updateUI() {
 
     const isOverLimit = me.cards && me.cards.length > 7;
     const cardsContainer = document.getElementById('my-cards-container');
-    if (cardsContainer) {
+    const eventCardsContainer = document.getElementById('event-cards-container');
+    
+    if (cardsContainer && eventCardsContainer) {
         cardsContainer.innerHTML = '';
-        if (me.cards && me.cards.length > 0) {
-            me.cards.forEach(cardCity => {
+        eventCardsContainer.innerHTML = '';
+        
+        // РОЗДІЛЯЄМО КАРТИ МІСТ ТА ПОДІЙ
+        const cityCards = me.cards ? me.cards.filter(c => !c.startsWith('EVENT_')) : [];
+        const eventCards = me.cards ? me.cards.filter(c => c.startsWith('EVENT_')) : [];
+
+        // 1. МАЛЮЄМО КАРТИ МІСТ
+        if (cityCards.length > 0) {
+            cityCards.forEach(cardCity => {
                 const cardEl = document.createElement('div');
                 const cityColor = mapData[cardCity] ? mapData[cardCity].color : "#718096";
-                
                 cardEl.innerText = cardCity;
                 cardEl.className = 'player-card'; 
                 cardEl.style.backgroundColor = cityColor; 
-                
                 if (isOverLimit && currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId) {
                     cardEl.style.cursor = "pointer";
                     cardEl.style.border = "2px solid #e53e3e"; 
@@ -159,7 +166,49 @@ function updateUI() {
                 cardsContainer.appendChild(cardEl);
             });
         } else {
-            cardsContainer.innerHTML = '<span class="no-cards-text">Немає карт</span>';
+            cardsContainer.innerHTML = '<span class="no-cards-text">Немає карт міст</span>';
+        }
+
+        // 2. МАЛЮЄМО КАРТИ ПОДІЙ
+        if (eventCards.length > 0) {
+            eventCards.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'player-card'; 
+                cardEl.style.backgroundColor = "#805ad5"; // Фіолетовий колір для подій
+                cardEl.innerHTML = `<strong style="font-size:12px;">${eventCardLabels[card]}</strong>`;
+                
+                // Кнопка для використання події
+                if (currentGameState.status === 'PLAYING') {
+                    const btnPlay = document.createElement('button');
+                    btnPlay.innerText = "Зіграти";
+                    btnPlay.className = "action-button";
+                    btnPlay.style.marginTop = "5px";
+                    btnPlay.style.padding = "4px";
+                    btnPlay.style.fontSize = "11px";
+                    btnPlay.onclick = () => handlePlayEventCard(card);
+                    cardEl.appendChild(btnPlay);
+                }
+                eventCardsContainer.appendChild(cardEl);
+            });
+        } else {
+            eventCardsContainer.innerHTML = '<span class="no-cards-text">Немає карт подій</span>';
+        }
+        
+        // 3. МЕНЮ ПЕРЕЛЬОТУ ІНЖЕНЕРА
+        const engineerFlightMenu = document.getElementById('engineer-flight-menu');
+        if (engineerFlightMenu) {
+            const isMyTurn = currentGameState.turnOrder[currentGameState.currentTurnIndex] === myPlayerId;
+            const onStation = currentGameState.researchStations && currentGameState.researchStations.includes(me.city);
+            
+            if (isMyTurn && me.role === "Інженер" && onStation && cityCards.length > 0) {
+                engineerFlightMenu.classList.remove('is-hidden');
+                engineerFlightCardSelect.innerHTML = '';
+                engineerFlightCitySelect.innerHTML = '';
+                cityCards.forEach(c => engineerFlightCardSelect.innerHTML += `<option value="${c}">Скинути: ${c}</option>`);
+                Object.keys(mapData).forEach(c => engineerFlightCitySelect.innerHTML += `<option value="${c}">Летіти в: ${c}</option>`);
+            } else {
+                engineerFlightMenu.classList.add('is-hidden');
+            }
         }
     }
 
