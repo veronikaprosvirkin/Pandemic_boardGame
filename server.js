@@ -411,7 +411,7 @@ io.on('connection', (socket) => {
                     }
 
                     if (moved) {
-                        saveSnapshot(); 
+                        //saveSnapshot(); 
                         movingPlayer.city = targetCity;
                         gameState.actionsLeft--;
 
@@ -810,44 +810,47 @@ io.on('connection', (socket) => {
             }
         }
     });
+    // === ОКРЕМА ФУНКЦІЯ ОЧИЩЕННЯ ГРИ ===
+    function resetGameState() {
+        gameState.status = 'LOBBY';
+        gameState.outbreaks = 0;
+        gameState.infectionRateIndex = 0;
+        gameState.cured = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
+        gameState.eradicated = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
+        gameState.researchStations = ['Атланта'];
+        gameState.quietNight = false;
+        
+        // Очищуємо гравців (але залишаємо їх у кімнаті)
+        Object.values(gameState.players).forEach(p => {
+            p.isReady = false;
+            p.cards = [];
+            p.city = null;
+            p.role = null;
+        });
+
+        // Повністю очищуємо всі масиви
+        infectionDeck = [];
+        infectionDiscard = [];
+        playerDeck = [];
+        playerDiscard = [];
+        turnSnapshots = [];
+        pendingEvent = null;
+
+        // Очищуємо всі кубики хвороб на мапі
+        for (let city in cities) {
+            cities[city].cubes = { 'синій': 0, 'жовтий': 0, 'чорний': 0, 'червоний': 0 };
+        }
+    }
+
     // === ПОВЕРНЕННЯ В ЛОБІ ПІСЛЯ ГРИ ===
-                socket.on('return_to_lobby', () => {
-                    if (gameState.status === 'GAME_OVER') {
-                        // Тотальне обнулення стану гри!
-                        gameState.status = 'LOBBY';
-                        gameState.outbreaks = 0;
-                        gameState.infectionRateIndex = 0;
-                        gameState.cured = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
-                        gameState.eradicated = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
-                        gameState.researchStations = ['Атланта'];
-                        gameState.quietNight = false;
-                        
-                        // Очищуємо гравців (але залишаємо їх у кімнаті)
-                        Object.values(gameState.players).forEach(p => {
-                            p.isReady = false;
-                            p.cards = [];
-                            p.city = null;
-                            p.role = null;
-                        });
+    socket.on('return_to_lobby', () => {
+        if (gameState.status === 'GAME_OVER') {
+            resetGameState(); // Викликаємо нашу нову функцію
+            io.emit('force_reload'); 
+        }
+    });
 
-                        // Повністю очищуємо всі масиви
-                        infectionDeck = [];
-                        infectionDiscard = [];
-                        playerDeck = [];
-                        playerDiscard = [];
-                        turnSnapshots = [];
-                        pendingEvent = null;
-
-                        // Очищуємо всі кубики хвороб на мапі
-                        for (let city in cities) {
-                            cities[city].cubes = { 'синій': 0, 'жовтий': 0, 'чорний': 0, 'червоний': 0 };
-                        }
-
-                        // Даємо команду всім браузерам перезавантажити сторінку
-                        io.emit('force_reload'); 
-                    }
-                });
-
+    // === ВІДКЛЮЧЕННЯ ГРАВЦЯ ===
     socket.on('disconnect', () => {
         const playerId = socketMap[socket.id];
         console.log(`Гравець відключився: ${socket.id}`);
@@ -863,20 +866,18 @@ io.on('connection', (socket) => {
             delete gameState.players[playerId];
             io.emit('lobby_update', gameState.players);
         } else if (player) {
-            player.currentSocketId = null; // Гравець "заморозився" (вийшов)
+            player.currentSocketId = null;
             
-            // --- ДОДАЙ ЦЮ ПЕРЕВІРКУ: ---
-            // Рахуємо, скільки гравців мають активний socket (тобто знаходяться в грі прямо зараз)
+            // Рахуємо, скільки гравців залишилося онлайн
             const activePlayers = Object.values(gameState.players).filter(p => p.currentSocketId !== null).length;
             
             if (activePlayers < 2) {
                 console.log('Залишилося менше 2 гравців, скидаємо гру до Лобі');
-                resetGameState(); // Функція, яку ми прописали раніше
-                io.emit('force_reload'); // Примусово оновлюємо сторінки всіх, щоб вони повернулися в Лобі
+                resetGameState(); // Викликаємо ту саму функцію при відключенні!
+                io.emit('force_reload'); 
             } else {
                 broadcastState();
             }
-            // ---------------------------
         }
 
         delete socketMap[socket.id];
