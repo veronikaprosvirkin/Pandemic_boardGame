@@ -55,9 +55,23 @@ function getCityInfectionEntries(cityName) {
 
     return Object.entries(raw).filter(([, count]) => count > 0);
 }
-    showNotification(`🌙 СПОКІЙНА НІЧ! Інфекція цього ходу не поширюється.`, 'card', '#805ad5');
 function hasAnyInfections(cityName) {
     return getCityInfectionEntries(cityName).length > 0;
+}
+
+function estimateInitialPlayerDeckSize(state) {
+    if (!state || !state.players || !mapData) return 0;
+
+    const playerCount = Object.keys(state.players).length;
+    let initialCards = 2;
+    if (playerCount === 2) initialCards = 4;
+    if (playerCount === 3) initialCards = 3;
+
+    const cityCardCount = Object.keys(mapData).length;
+    const eventCardCount = 5;
+    const epidemicCount = 4;
+
+    return cityCardCount + eventCardCount + epidemicCount - (playerCount * initialCards);
 }
 
 function colorLabel(hexColor) {
@@ -165,6 +179,7 @@ let isDrawLoopRunning = false;
 socket.on('game_started', (data) => {
     mapData = data.cities;
     currentGameState = data.gameState;
+    currentGameState.deckSize = data.deckSize !== undefined ? data.deckSize : estimateInitialPlayerDeckSize(data.gameState);
     
     lobbyView.classList.add('is-hidden');
     gameView.classList.remove('is-hidden');
@@ -720,7 +735,7 @@ function draw() {
         const infRate = currentGameState.infectionRate || 2;
         const outbrks = currentGameState.outbreaks || 0;
         
-        const deckSize = currentGameState.deckSize !== undefined ? currentGameState.deckSize : 0;
+        const deckSize = currentGameState.deckSize !== undefined ? currentGameState.deckSize : estimateInitialPlayerDeckSize(currentGameState);
         const deckWarning = deckSize <= 5 ? '❗️' : '🃏';
         // ---------------------------
 

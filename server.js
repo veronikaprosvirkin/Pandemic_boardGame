@@ -27,6 +27,8 @@ let gameState = {
 let infectionDeck = [];
 let infectionDiscard = [];
 let playerDeck = [];
+let playerDiscard = [];
+let turnSnapshots = [];
 
 function broadcastState() {
     gameState.deckSize = playerDeck.length;
@@ -88,6 +90,21 @@ function ensureCityInfections(cityName) {
         gameState.infections[cityName] = {};
     }
     return gameState.infections[cityName];
+}
+
+function saveSnapshot() {
+    turnSnapshots.push({
+        gameState: JSON.parse(JSON.stringify(gameState)),
+        infectionDeck: [...infectionDeck],
+        infectionDiscard: [...infectionDiscard],
+        playerDeck: [...playerDeck],
+        playerDiscard: [...playerDiscard],
+        pendingEvent: pendingEvent ? JSON.parse(JSON.stringify(pendingEvent)) : null
+    });
+
+    if (turnSnapshots.length > 20) {
+        turnSnapshots.shift();
+    }
 }
 
 io.on('connection', (socket) => {
@@ -244,7 +261,7 @@ io.on('connection', (socket) => {
                 playerDeck = playerDeck.concat(pile); 
             }
 
-            io.emit('game_started', { cities, gameState });
+            io.emit('game_started', { cities, gameState, deckSize: playerDeck.length });
         }
     }
 
@@ -834,18 +851,32 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         const playerId = socketMap[socket.id];
         console.log(`Гравець відключився: ${socket.id}`);
+        
         if (!playerId) {
             delete socketMap[socket.id];
             return;
         }
 
         const player = gameState.players[playerId];
+        
         if (gameState.status === 'LOBBY') {
             delete gameState.players[playerId];
             io.emit('lobby_update', gameState.players);
         } else if (player) {
-            player.currentSocketId = null;
-            broadcastState();
+            player.currentSocketId = null; // Гравець "заморозився" (вийшов)
+            
+            // --- ДОДАЙ ЦЮ ПЕРЕВІРКУ: ---
+            // Рахуємо, скільки гравців мають активний socket (тобто знаходяться в грі прямо зараз)
+            const activePlayers = Object.values(gameState.players).filter(p => p.currentSocketId !== null).length;
+            
+            if (activePlayers < 2) {
+                console.log('Залишилося менше 2 гравців, скидаємо гру до Лобі');
+                resetGameState(); // Функція, яку ми прописали раніше
+                io.emit('force_reload'); // Примусово оновлюємо сторінки всіх, щоб вони повернулися в Лобі
+            } else {
+                broadcastState();
+            }
+            // ---------------------------
         }
 
         delete socketMap[socket.id];
