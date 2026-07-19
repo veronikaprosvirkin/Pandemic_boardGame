@@ -81,11 +81,11 @@ const roleDescriptions = {
 };
 
 const eventCardLabels = {
-    'EVENT_ONE_QUIET_NIGHT': 'Спокійна ніч', // Замість "Тиха ніч"
-    'EVENT_GOVERNMENT_GRANT': 'Державна підтримка', // Замість "Урядовий грант"
-    'EVENT_AIRLIFT': 'Повітряний міст', // Так і було
-    'EVENT_FORECAST': 'Прогноз', // Так і було
-    'EVENT_RESILIENT_POPULATION': 'Імунітет' // Замість "Стійка популяція"
+    'EVENT_ONE_QUIET_NIGHT': 'Спокійна ніч',
+    'EVENT_GOVERNMENT_GRANT': 'Державна підтримка',
+    'EVENT_AIRLIFT': 'Повітряний міст',
+    'EVENT_FORECAST': 'Прогноз',
+    'EVENT_RESILIENT_POPULATION': 'Імунітет'
 };
 
 const eventCardDescriptions = {

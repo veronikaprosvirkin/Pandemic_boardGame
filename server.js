@@ -26,7 +26,12 @@ let gameState = {
 
 let infectionDeck = [];
 let infectionDiscard = [];
-let playerDeck = []; 
+let playerDeck = [];
+
+function broadcastState() {
+    gameState.deckSize = playerDeck.length;
+    io.emit('state_update', gameState);
+} 
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину", "Інженер"];
 const EVENT_CARDS = [
@@ -122,7 +127,7 @@ io.on('connection', (socket) => {
 
             existingPlayer.currentSocketId = socket.id;
             socket.emit('game_started', { cities, gameState });
-            socket.emit('state_update', gameState);
+            socket.emit('state_update', { ...gameState, deckSize: playerDeck.length });
 
             // НОВЕ: Відновлення вікна події, якщо гравець оновив сторінку!
             if (pendingEvent && pendingEvent.playerId === playerId) {
@@ -407,7 +412,7 @@ io.on('connection', (socket) => {
                             }
                         }
 
-                        io.emit('state_update', gameState);
+                        broadcastState();
                     }
                 });
 
@@ -437,7 +442,7 @@ io.on('connection', (socket) => {
 
                     gameState.actionsLeft--;
                     checkEradication();
-                    io.emit('state_update', gameState);
+                    broadcastState();
                 });
 
                 socket.on('share_knowledge', ({ action, targetId, cardCity }) => {
@@ -469,7 +474,7 @@ io.on('connection', (socket) => {
                             gameState.actionsLeft--;
                         }
                     }
-                    io.emit('state_update', gameState);
+                    broadcastState();
                 });
 
                 socket.on('play_event_card', (data) => {
@@ -503,7 +508,7 @@ io.on('connection', (socket) => {
                             };
 
                             emitToPlayer(playerId, 'forecast_ready', { eventCard, cards: previewCards });
-                            io.emit('state_update', gameState);
+                            broadcastState();
                             return;
                         }
 
@@ -521,7 +526,7 @@ io.on('connection', (socket) => {
                                 eventCard,
                                 discardCards: [...infectionDiscard]
                             });
-                            io.emit('state_update', gameState);
+                            broadcastState();
                             return;
                         }
 
@@ -531,7 +536,7 @@ io.on('connection', (socket) => {
                     if (eventCard === 'EVENT_ONE_QUIET_NIGHT') {
                         removeCardFromHand(player, eventCard);
                         gameState.quietNight = true;
-                        io.emit('state_update', gameState);
+                        broadcastState();
                         return;
                     }
 
@@ -546,7 +551,7 @@ io.on('connection', (socket) => {
 
                         removeCardFromHand(player, eventCard);
                         gameState.researchStations.push(targetCity);
-                        io.emit('state_update', gameState);
+                        broadcastState();
                         return;
                     }
 
@@ -559,7 +564,7 @@ io.on('connection', (socket) => {
 
                         removeCardFromHand(player, eventCard);
                         targetPlayer.city = targetCity;
-                        io.emit('state_update', gameState);
+                        broadcastState();
                         return;
                     }
                 });
@@ -582,7 +587,7 @@ io.on('connection', (socket) => {
                             infectionDeck.push(orderedCards[i]);
                         }
                         pendingEvent = null;
-                        io.emit('state_update', gameState);
+                        broadcastState();
                         return;
                     }
 
@@ -593,7 +598,7 @@ io.on('connection', (socket) => {
 
                         infectionDiscard.splice(index, 1);
                         pendingEvent = null;
-                        io.emit('state_update', gameState);
+                        broadcastState();
                         return;
                     }
                 });
@@ -613,7 +618,7 @@ io.on('connection', (socket) => {
                     }
 
                     pendingEvent = null;
-                    io.emit('state_update', gameState);
+                    broadcastState();
                 });
 
                 // === КІНЕЦЬ ХОДУ ТА ЕПІДЕМІЇ ===
@@ -687,7 +692,7 @@ io.on('connection', (socket) => {
 
                     gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
                     gameState.actionsLeft = 4;
-                    io.emit('state_update', gameState);
+                    broadcastState();
                 });
 
     socket.on('build_station', () => {
@@ -717,7 +722,7 @@ io.on('connection', (socket) => {
             if (canBuild) {
                 gameState.researchStations.push(player.city);
                 gameState.actionsLeft--;
-                io.emit('state_update', gameState);
+                broadcastState();
             }
         }
     });
@@ -766,7 +771,7 @@ io.on('connection', (socket) => {
 
                 gameState.actionsLeft--;
                 checkEradication();
-                io.emit('state_update', gameState);
+                broadcastState();
                 io.emit('cure_discovered', color);
 
                 if (Object.keys(gameState.cured).length >= 4) {
@@ -784,7 +789,7 @@ io.on('connection', (socket) => {
             const idx = player.cards.indexOf(cardName);
             if (idx !== -1) {
                 player.cards.splice(idx, 1);
-                io.emit('state_update', gameState);
+                broadcastState();
             }
         }
     });
@@ -803,7 +808,7 @@ io.on('connection', (socket) => {
             io.emit('lobby_update', gameState.players);
         } else if (player) {
             player.currentSocketId = null;
-            io.emit('state_update', gameState);
+            broadcastState();
         }
 
         delete socketMap[socket.id];
