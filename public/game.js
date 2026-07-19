@@ -719,7 +719,12 @@ function draw() {
     if (currentGameState.status === 'PLAYING') {
         const infRate = currentGameState.infectionRate || 2;
         const outbrks = currentGameState.outbreaks || 0;
-        const text = `☣️ Швидкість інфекції: ${infRate}      |      💥 Спалахи: ${outbrks} / 8`;
+        
+        const deckSize = currentGameState.deckSize !== undefined ? currentGameState.deckSize : 0;
+        const deckWarning = deckSize <= 5 ? '❗️' : '🃏';
+        // ---------------------------
+
+        const text = `☣️ Швидкість інфекції: ${infRate}   |   💥 Спалахи: ${outbrks} / 8   |   ${deckWarning} Карт у колоді: ${deckSize}`;
 
         ctx.font = "bold 18px Arial";
         const textWidth = ctx.measureText(text).width; 
