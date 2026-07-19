@@ -793,6 +793,43 @@ io.on('connection', (socket) => {
             }
         }
     });
+    // === ПОВЕРНЕННЯ В ЛОБІ ПІСЛЯ ГРИ ===
+                socket.on('return_to_lobby', () => {
+                    if (gameState.status === 'GAME_OVER') {
+                        // Тотальне обнулення стану гри!
+                        gameState.status = 'LOBBY';
+                        gameState.outbreaks = 0;
+                        gameState.infectionRateIndex = 0;
+                        gameState.cured = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
+                        gameState.eradicated = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
+                        gameState.researchStations = ['Атланта'];
+                        gameState.quietNight = false;
+                        
+                        // Очищуємо гравців (але залишаємо їх у кімнаті)
+                        Object.values(gameState.players).forEach(p => {
+                            p.isReady = false;
+                            p.cards = [];
+                            p.city = null;
+                            p.role = null;
+                        });
+
+                        // Повністю очищуємо всі масиви
+                        infectionDeck = [];
+                        infectionDiscard = [];
+                        playerDeck = [];
+                        playerDiscard = [];
+                        turnSnapshots = [];
+                        pendingEvent = null;
+
+                        // Очищуємо всі кубики хвороб на мапі
+                        for (let city in cities) {
+                            cities[city].cubes = { 'синій': 0, 'жовтий': 0, 'чорний': 0, 'червоний': 0 };
+                        }
+
+                        // Даємо команду всім браузерам перезавантажити сторінку
+                        io.emit('force_reload'); 
+                    }
+                });
 
     socket.on('disconnect', () => {
         const playerId = socketMap[socket.id];
