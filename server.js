@@ -375,20 +375,21 @@ io.on('connection', (socket) => {
                     }
 
                     if (!moved && currentCity && currentCity.connections.includes(targetCity)) {
-                        moved = true;
+                        moved = true; // Звичайний рух у сусіднє місто
                     } else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
-                        moved = true;
+                        moved = true; // ДИСПЕТЧЕР: переміщує БУДЬ-ЯКУ фішку туди, де вже є інша фішка
                     } else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
-                        moved = true; // <--- ПЕРЕМІСТИЛИ ПЕРЕВІРКУ СТАНЦІЙ СЮДИ! (БЕЗКОШТОВНО)
+                        moved = true; // СЛУЖБОВИЙ РЕЙС: від станції до станції (безкоштовно)
                     } else if (!moved && player.cards.includes(targetCity)) {
-                        removeCardFromHand(player, targetCity); // Прямий рейс (Витрачає карту)
+                        removeCardFromHand(player, targetCity); // ПРЯМИЙ РЕЙС (витрачає карту міста, КУДИ летить)
                         moved = true;
                     } else if (!moved && player.cards.includes(movingPlayer.city)) {
-                        removeCardFromHand(player, movingPlayer.city); // Чартерний рейс (Витрачає карту)
+                        removeCardFromHand(player, movingPlayer.city); // ЧАРТЕРНИЙ РЕЙС (витрачає карту міста, З ЯКОГО летить)
                         moved = true;
                     }
 
                     if (moved) {
+                        saveSnapshot(); 
                         movingPlayer.city = targetCity;
                         gameState.actionsLeft--;
 
