@@ -378,13 +378,13 @@ io.on('connection', (socket) => {
                         moved = true;
                     } else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
                         moved = true;
+                    } else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
+                        moved = true; // <--- ПЕРЕМІСТИЛИ ПЕРЕВІРКУ СТАНЦІЙ СЮДИ! (БЕЗКОШТОВНО)
                     } else if (!moved && player.cards.includes(targetCity)) {
-                        removeCardFromHand(player, targetCity);
+                        removeCardFromHand(player, targetCity); // Прямий рейс (Витрачає карту)
                         moved = true;
                     } else if (!moved && player.cards.includes(movingPlayer.city)) {
-                        removeCardFromHand(player, movingPlayer.city);
-                        moved = true;
-                    } else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
+                        removeCardFromHand(player, movingPlayer.city); // Чартерний рейс (Витрачає карту)
                         moved = true;
                     }
 
