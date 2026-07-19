@@ -1039,3 +1039,7 @@ socket.on('forecast_ready', (data) => {
 socket.on('quiet_night_skipped', () => {
     showNotification(`🌙 СПОКІЙНА НІЧ! Інфекція цього ходу не поширюється..`, 'card', '#805ad5');
 });
+
+socket.on('force_reload', () => {
+    window.location.reload();
+});
