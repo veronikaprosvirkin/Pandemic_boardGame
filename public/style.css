@@ -567,3 +567,64 @@ body {
     transform: scale(1.2);
     color: #ffffff;
 }
+.deck-normal {
+    color: #3182ce;
+}
+
+.deck-danger {
+    color: #e53e3e;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Відновлена верхня панель (HUD) */
+.top-hud {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%); /* Центруємо рівно посередині */
+    background-color: rgba(26, 32, 44, 0.85); /* Темно-синій/сірий напівпрозорий фон */
+    color: #e2e8f0; /* Світло-сірий текст */
+    padding: 10px 25px;
+    border-radius: 20px; /* Заокруглені краї як на фото */
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
+    border: 1px solid #4a5568;
+    z-index: 10;
+    pointer-events: none; /* Щоб кліки мишкою проходили крізь неї на мапу */
+}
+
+.hud-item {
+    display: flex;
+    align-items: center;
+}
+
+.hud-divider {
+    color: #718096;
+    font-weight: normal;
+}
+
+/* Кольори для лічильника колоди */
+.deck-normal {
+    color: #63b3ed; /* Світло-блакитний, щоб гарно читався на темному фоні */
+}
+
+.deck-danger {
+    color: #fc8181; /* Світло-червоний */
+    animation: pulse 1.5s infinite; /* Пульсація при критичній кількості карт */
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}

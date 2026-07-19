@@ -22,7 +22,17 @@
     <div id="game-view" class="is-hidden game-view">
         
         <!-- ЛІВА ЧАСТИНА: МАПА -->
-        <div id="game-container">
+        <div id="game-container" style="position: relative;">
+            
+            <!-- ВІДНОВЛЕНА ВЕРХНЯ ПАНЕЛЬ (HUD) -->
+            <div class="top-hud">
+                <span class="hud-item">☣️ Швидкість інфекції: <span id="infection-rate-val" style="margin-left: 5px;">2</span></span>
+                <span class="hud-divider">|</span>
+                <span class="hud-item">💥 Спалахи: <span id="outbreaks-val" style="margin-left: 5px;">0 / 8</span></span>
+                <span class="hud-divider">|</span>
+                <span class="hud-item">🃏 Карт у колоді: <span id="player-deck-val" class="deck-normal" style="margin-left: 5px;">0</span></span>
+            </div>
+
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
         </div>
 

@@ -55,7 +55,7 @@ function getCityInfectionEntries(cityName) {
 
     return Object.entries(raw).filter(([, count]) => count > 0);
 }
-
+    showNotification(`🌙 СПОКІЙНА НІЧ! Інфекція цього ходу не поширюється.`, 'card', '#805ad5');
 function hasAnyInfections(cityName) {
     return getCityInfectionEntries(cityName).length > 0;
 }
@@ -81,11 +81,11 @@ const roleDescriptions = {
 };
 
 const eventCardLabels = {
-    EVENT_ONE_QUIET_NIGHT: 'Подія: Тиха ніч',
-    EVENT_GOVERNMENT_GRANT: 'Подія: Урядовий грант',
-    EVENT_AIRLIFT: 'Подія: Повітряний міст',
-    EVENT_RESILIENT_POPULATION: 'Подія: Стійка популяція',
-    EVENT_FORECAST: 'Подія: Прогноз'
+    'EVENT_ONE_QUIET_NIGHT': 'Спокійна ніч', // Замість "Тиха ніч"
+    'EVENT_GOVERNMENT_GRANT': 'Державна підтримка', // Замість "Урядовий грант"
+    'EVENT_AIRLIFT': 'Повітряний міст', // Так і було
+    'EVENT_FORECAST': 'Прогноз', // Так і було
+    'EVENT_RESILIENT_POPULATION': 'Імунітет' // Замість "Стійка популяція"
 };
 
 const eventCardDescriptions = {
@@ -997,7 +997,7 @@ socket.on('resilient_population_ready', (data) => {
     let html = `<select id="modal-resilient-select" class="trade-select modal-select-full">`;
     data.discardCards.forEach(c => html += `<option value="${c}">${c}</option>`);
     html += `</select>`;
-    openEventModal('Стійка популяція', 'Оберіть карту для ВИДАЛЕННЯ з гри:', html, data.eventCard);
+    openEventModal('Імунітет', 'Оберіть карту для ВИДАЛЕННЯ з гри:', html, data.eventCard);
 });
 
 socket.on('forecast_ready', (data) => {
@@ -1017,5 +1017,5 @@ socket.on('forecast_ready', (data) => {
 });
 
 socket.on('quiet_night_skipped', () => {
-    showNotification(`🌙 ТИХА НІЧ! Інфекція цього ходу не поширюється.`, 'card', '#805ad5');
+    showNotification(`🌙 СПОКІЙНА НІЧ! Інфекція цього ходу не поширюється..`, 'card', '#805ad5');
 });
