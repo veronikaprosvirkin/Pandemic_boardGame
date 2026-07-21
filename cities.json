@@ -149,25 +149,25 @@
     },
 
     "Lagos": {
-    "color": "#ecc94b",
+    "color": "#d69e2e",
     "x": 510,
     "y": 380,
     "connections": ["Sao Paulo", "Khartoum", "Kinshasa"]
     },
     "Khartoum": {
-    "color": "#ecc94b",
+    "color": "#d69e2e",
     "x": 650,
     "y": 450,
     "connections": ["Cairo", "Lagos", "Kinshasa", "Johannesburg"]
     },
     "Kinshasa": {
-    "color": "#ecc94b",
+    "color": "#d69e2e",
     "x": 550,
     "y": 440,
     "connections": ["Lagos", "Khartoum", "Johannesburg"]
     },
     "Johannesburg": {
-    "color": "#ecc94b",
+    "color": "#d69e2e",
     "x": 610,
     "y": 540,
     "connections": ["Khartoum", "Kinshasa"]

@@ -24,6 +24,15 @@
         <!-- ЛІВА ЧАСТИНА: МАПА -->
         <div id="game-container" style="position: relative;">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
+            
+            <!-- ВЕРХНЯ ПАНЕЛЬ СТАТИСТИКИ -->
+            <div id="top-hud-panel" class="top-hud is-hidden">
+                <span id="hud-infection">☣️ Швидкість інфекції: 2</span>
+                <span class="hud-divider">|</span>
+                <span id="hud-outbreaks">💥 Спалахи: 0 / 8</span>
+                <span class="hud-divider">|</span>
+                <span id="hud-deck">🃏 Карт у колоді: 34</span>
+            </div>
         </div>
 
         <!-- ПРАВА ЧАСТИНА: БОКОВА ПАНЕЛЬ -->
@@ -100,7 +109,7 @@
     <div id="game-over-screen" class="game-over-overlay is-hidden">
         <h1 id="game-over-title" class="game-over-title">Кінець гри</h1>
         <p id="game-over-reason" class="game-over-reason"></p>
-        <button onclick="location.reload()" class="action-button replay-button">Грати знову</button>
+        <button id="btn-replay" class="action-button replay-button">Грати знову</button>
     </div>
 
     <!-- КОНТЕЙНЕР ДЛЯ СПОВІЩЕНЬ -->

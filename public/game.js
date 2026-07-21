@@ -156,18 +156,19 @@ socket.on('lobby_update', (players) => {
     }
 
     const myLobbyPlayer = players[myPlayerId];
-    if (myLobbyPlayer && myLobbyPlayer.isReady) {
-        btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
-        btnReady.style.backgroundColor = "#718096";
-        btnReady.disabled = true;
+    if (myLobbyPlayer) {
+        if (myLobbyPlayer.isReady) {
+            btnReady.innerText = "СКАСУВАТИ ГОТОВНІСТЬ";
+            btnReady.style.backgroundColor = "#e53e3e";
+        } else {
+            btnReady.innerText = "Я ГОТОВИЙ";
+            btnReady.style.backgroundColor = ""; 
+        }
     }
 });
 
 btnReady.addEventListener('click', () => {
     socket.emit('player_ready');
-    btnReady.innerText = "ОЧІКУВАННЯ ІНШИХ...";
-    btnReady.style.backgroundColor = "#718096"; 
-    btnReady.disabled = true;
 });
 
 socket.on('game_already_started', () => {
@@ -508,6 +509,27 @@ function updateUI() {
             curesContainer.innerHTML = '<span class="no-cards-text">Поки немає</span>';
         }
     }
+    // ОНОВЛЕННЯ ВЕРХНЬОЇ HTML-ПАНЕЛІ (HUD)
+    const hudPanel = document.getElementById('top-hud-panel');
+    if (hudPanel) {
+        if (currentGameState.status === 'PLAYING') {
+            hudPanel.classList.remove('is-hidden');
+            const infRate = currentGameState.infectionRate || 2;
+            const outbrks = currentGameState.outbreaks || 0;
+            const deckSize = currentGameState.deckSize !== undefined ? currentGameState.deckSize : estimateInitialPlayerDeckSize(currentGameState);
+            const deckWarning = deckSize <= 5 ? '❗️' : '🃏';
+            const deckClass = deckSize <= 5 ? 'deck-danger' : 'deck-normal';
+
+            document.getElementById('hud-infection').innerText = `☣️ Швидкість інфекції: ${infRate}`;
+            document.getElementById('hud-outbreaks').innerText = `💥 Спалахи: ${outbrks} / 8`;
+            
+            const deckEl = document.getElementById('hud-deck');
+            deckEl.className = deckClass;
+            deckEl.innerText = `${deckWarning} Карт у колоді: ${deckSize}`;
+        } else {
+            hudPanel.classList.add('is-hidden');
+        }
+    }
 }
 
 function draw() {
@@ -729,46 +751,6 @@ function draw() {
                 ctx.stroke();
             }
         });
-    }
-
-    if (currentGameState.status === 'PLAYING') {
-        const infRate = currentGameState.infectionRate || 2;
-        const outbrks = currentGameState.outbreaks || 0;
-        
-        const deckSize = currentGameState.deckSize !== undefined ? currentGameState.deckSize : estimateInitialPlayerDeckSize(currentGameState);
-        const deckWarning = deckSize <= 5 ? '❗️' : '🃏';
-        // ---------------------------
-
-        const text = `☣️ Швидкість інфекції: ${infRate}   |   💥 Спалахи: ${outbrks} / 8   |   ${deckWarning} Карт у колоді: ${deckSize}`;
-
-        ctx.font = "bold 18px Arial";
-        const textWidth = ctx.measureText(text).width; 
-        
-        const panelWidth = textWidth + 40; 
-        const panelHeight = 50;
-        const panelX = (canvas.width - panelWidth) / 2;
-        const panelY = 15;
-
-        ctx.fillStyle = "rgba(26, 32, 44, 0.85)";
-        ctx.beginPath();
-        if (ctx.roundRect) {
-            ctx.roundRect(panelX, panelY, panelWidth, panelHeight, 10);
-        } else {
-            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-        }
-        ctx.fill();
-        
-        ctx.strokeStyle = currentGameState.outbreaks >= 6 ? "#e53e3e" : "#4a5568";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(text, canvas.width / 2, panelY + (panelHeight / 2));
-        
-        ctx.textAlign = "left";
-        ctx.textBaseline = "alphabetic";
     }
 
     requestAnimationFrame(draw);
@@ -1043,3 +1025,10 @@ socket.on('quiet_night_skipped', () => {
 socket.on('force_reload', () => {
     window.location.reload();
 });
+
+const btnReplay = document.getElementById('btn-replay');
+if (btnReplay) {
+    btnReplay.addEventListener('click', () => {
+        socket.emit('return_to_lobby');
+    });
+}

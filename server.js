@@ -169,7 +169,7 @@ io.on('connection', (socket) => {
     socket.on('player_ready', () => {
         const { playerId, player } = getPlayerForSocket(socket);
         if (playerId && player) {
-            gameState.players[playerId].isReady = true;
+            gameState.players[playerId].isReady = !gameState.players[playerId].isReady;
             io.emit('lobby_update', gameState.players);
             checkGameStart();
         }
@@ -189,8 +189,8 @@ io.on('connection', (socket) => {
             gameState.infectionRateIndex = 0;
             gameState.infectionRate = 2;
             gameState.researchStations = ["Atlanta"]; 
-            gameState.cured = {}; 
-            gameState.eradicated = {}; // НОВЕ: Знищені хвороби
+            gameState.cured = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false }; 
+            gameState.eradicated = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
             gameState.quietNight = false;
             pendingEvent = null;
 
@@ -499,7 +499,6 @@ io.on('connection', (socket) => {
                     const player = playerId ? gameState.players[playerId] : null;
                     if (gameState.status !== 'PLAYING') return;
                     if (!playerId || !player) return;
-                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
                     if (pendingEvent && pendingEvent.playerId === playerId) return;
 
                     const eventCard = typeof data === 'object' ? data.eventCard : data;
@@ -573,17 +572,30 @@ io.on('connection', (socket) => {
                     }
 
                     if (eventCard === 'EVENT_AIRLIFT') {
-                        const targetPlayerId = typeof data === 'object' ? data.targetPlayerId : null;
-                        const targetCity = typeof data === 'object' ? data.targetCity : null;
-                        const targetPlayer = gameState.players[targetPlayerId];
+                    const targetPlayerId = typeof data === 'object' ? data.targetPlayerId : null;
+                    const targetCity = typeof data === 'object' ? data.targetCity : null;
+                    const targetPlayer = gameState.players[targetPlayerId];
 
-                        if (!targetPlayer || !cities[targetCity]) return;
+                    if (!targetPlayer || !cities[targetCity]) return;
 
-                        removeCardFromHand(player, eventCard);
-                        targetPlayer.city = targetCity;
-                        broadcastState();
-                        return;
+                    removeCardFromHand(player, eventCard);
+                    targetPlayer.city = targetCity;
+
+                    if (targetPlayer.role === "Медик") {
+                    const cityInfections = ensureCityInfections(targetPlayer.city);
+                    let removedAny = false;
+                    for (const [cubeColor, count] of Object.entries(cityInfections)) {
+                        if (count > 0 && gameState.cured && gameState.cured[cubeColor]) {
+                        delete cityInfections[cubeColor];
+                        removedAny = true;
                     }
+                }
+                if (removedAny) checkEradication();
+        }
+
+    broadcastState();
+    return;
+}
                 });
 
                 socket.on('resolve_event_card', (data) => {
@@ -791,7 +803,8 @@ io.on('connection', (socket) => {
                 broadcastState();
                 io.emit('cure_discovered', color);
 
-                if (Object.keys(gameState.cured).length >= 4) {
+                const curedCount = Object.values(gameState.cured).filter(v => v === true).length;
+                if (curedCount >= 4) {
                     triggerGameOver(true, 'ЛЮДСТВО ВРЯТОВАНО! Винайдено всі 4 вакцини!');
                 }
                 return;
@@ -815,9 +828,10 @@ io.on('connection', (socket) => {
         gameState.status = 'LOBBY';
         gameState.outbreaks = 0;
         gameState.infectionRateIndex = 0;
-        gameState.cured = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
-        gameState.eradicated = { 'синій': false, 'жовтий': false, 'чорний': false, 'червоний': false };
-        gameState.researchStations = ['Атланта'];
+        gameState.infectionRate = 2;
+        gameState.cured = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
+        gameState.eradicated = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
+        gameState.researchStations = ['Atlanta'];
         gameState.quietNight = false;
         
         // Очищуємо гравців (але залишаємо їх у кімнаті)
@@ -828,18 +842,14 @@ io.on('connection', (socket) => {
             p.role = null;
         });
 
-        // Повністю очищуємо всі масиви
+        // Повністю очищуємо всі масиви та інфекції на мапі
         infectionDeck = [];
         infectionDiscard = [];
         playerDeck = [];
         playerDiscard = [];
         turnSnapshots = [];
         pendingEvent = null;
-
-        // Очищуємо всі кубики хвороб на мапі
-        for (let city in cities) {
-            cities[city].cubes = { 'синій': 0, 'жовтий': 0, 'чорний': 0, 'червоний': 0 };
-        }
+        gameState.infections = {}; // Очищуємо кубики правильно
     }
 
     // === ПОВЕРНЕННЯ В ЛОБІ ПІСЛЯ ГРИ ===
