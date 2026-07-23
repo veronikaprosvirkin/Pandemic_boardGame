@@ -316,9 +316,32 @@ function updateUI() {
                 if (btnCure) btnCure.classList.add('is-hidden'); 
                 if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
                 if (tradeMenu) tradeMenu.classList.add('is-hidden');
+                
+            } else if (currentGameState.currentPhase === 'INFECTION') {
+                // НОВИЙ БЛОК: ФАЗА ІНФЕКЦІЇ (ПАУЗА)
+                actionsSpan.innerText = "ФАЗА ІНФЕКЦІЇ";
+                actionsSpan.style.color = "#e53e3e";
+                
+                endTurnBtn.innerText = "☣️ Почати зараження";
+                endTurnBtn.style.backgroundColor = "#e53e3e";
+                endTurnBtn.classList.remove('is-hidden');
+                
+                // Ховаємо звичайні дії, бо зараз можна грати тільки події
+                if (btnTreat) btnTreat.classList.add('is-hidden');
+                if (treatColorSelect) treatColorSelect.classList.add('is-hidden');
+                if (btnBuild) btnBuild.classList.add('is-hidden');
+                if (btnCure) btnCure.classList.add('is-hidden'); 
+                if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
+                if (tradeMenu) tradeMenu.classList.add('is-hidden');
+                if (engineerFlightMenu) engineerFlightMenu.classList.add('is-hidden');
+
             } else {
+                // СТАРИЙ БЛОК: ЗВИЧАЙНА ФАЗА ДІЙ
                 actionsSpan.innerText = currentGameState.actionsLeft;
                 actionsSpan.style.color = "#ed8936";
+                
+                endTurnBtn.innerText = "Взяти карти (Кінець ходу)";
+                endTurnBtn.style.backgroundColor = "#ed8936";
                 endTurnBtn.classList.remove('is-hidden');
 
                 // 1. ЛІКУВАННЯ
@@ -759,7 +782,11 @@ function draw() {
 const endTurnBtn = document.getElementById('end-turn-btn');
 if (endTurnBtn) {
     endTurnBtn.addEventListener('click', () => {
-        socket.emit('end_turn');
+        if (currentGameState.currentPhase === 'INFECTION') {
+            socket.emit('resolve_infections');
+        } else {
+            socket.emit('draw_player_cards');
+        }
     });
 }
 

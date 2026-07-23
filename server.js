@@ -185,6 +185,7 @@ io.on('connection', (socket) => {
             gameState.turnOrder = []; 
             gameState.currentTurnIndex = 0;
             gameState.actionsLeft = 4;
+            gameState.currentPhase = 'ACTIONS';
             gameState.outbreaks = 0;
             gameState.infectionRateIndex = 0;
             gameState.infectionRate = 2;
@@ -369,6 +370,7 @@ io.on('connection', (socket) => {
                     const specialFlight = typeof data === 'object' ? data.specialFlight === true : false;
 
                     if (gameState.status !== 'PLAYING') return;
+                    if (gameState.currentPhase !== 'ACTIONS') return;
                     if (!playerId || !player) return;
                     if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
                     if (gameState.actionsLeft <= 0) return;
@@ -437,6 +439,7 @@ io.on('connection', (socket) => {
                     const playerId = getPlayerIdForSocket(socket);
                     const player = playerId ? gameState.players[playerId] : null;
                     if (gameState.status !== 'PLAYING') return;
+                    if (gameState.currentPhase !== 'ACTIONS') return;
                     if (!playerId || !player) return;
                     if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
                     if (gameState.actionsLeft <= 0) return;
@@ -466,6 +469,7 @@ io.on('connection', (socket) => {
                     const playerId = getPlayerIdForSocket(socket);
                     const player = playerId ? gameState.players[playerId] : null;
                     if (gameState.status !== 'PLAYING') return;
+                    if (gameState.currentPhase !== 'ACTIONS') return;
                     if (!playerId || !player) return;
                     if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
                     if (gameState.actionsLeft <= 0) return;
@@ -650,13 +654,14 @@ io.on('connection', (socket) => {
                     broadcastState();
                 });
 
-                // === КІНЕЦЬ ХОДУ ТА ЕПІДЕМІЇ ===
-                socket.on('end_turn', () => {
+                // === ЧАСТИНА 1: ДОБІР КАРТ ГРАВЦЯ ТА ЕПІДЕМІЇ ===
+                socket.on('draw_player_cards', () => {
                     const playerId = getPlayerIdForSocket(socket);
                     const player = playerId ? gameState.players[playerId] : null;
                     if (gameState.status !== 'PLAYING') return;
                     if (!playerId || !player) return;
                     if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (gameState.currentPhase !== 'ACTIONS') return;
                     if (pendingEvent && pendingEvent.playerId === playerId) return;
 
                     if (!player.cards) player.cards = [];
@@ -687,7 +692,6 @@ io.on('connection', (socket) => {
                         if (infectionDeck.length > 0) {
                             const bottomCity = infectionDeck.shift();
                             infectionDiscard.push(bottomCity);
-
                             infectCity(bottomCity, 3, new Set());
                             io.emit('epidemic_alert', bottomCity);
                         }
@@ -699,6 +703,21 @@ io.on('connection', (socket) => {
                         infectionDeck = infectionDeck.concat(infectionDiscard);
                         infectionDiscard = [];
                     }
+
+                    // Змінюємо фазу на інфекцію (пауза для карт подій)
+                    gameState.currentPhase = 'INFECTION';
+                    broadcastState();
+                });
+
+                // === ЧАСТИНА 2: ФАЗА ЗАРАЖЕННЯ І ПЕРЕДАЧА ХОДУ ===
+                socket.on('resolve_infections', () => {
+                    const playerId = getPlayerIdForSocket(socket);
+                    const player = playerId ? gameState.players[playerId] : null;
+                    if (gameState.status !== 'PLAYING') return;
+                    if (!playerId || !player) return;
+                    if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
+                    if (gameState.currentPhase !== 'INFECTION') return;
+                    if (pendingEvent) return; // Чекаємо, поки всі розіграють свої події
 
                     const infectedCitiesThisTurn = [];
                     if (gameState.quietNight) {
@@ -721,6 +740,7 @@ io.on('connection', (socket) => {
 
                     gameState.currentTurnIndex = (gameState.currentTurnIndex + 1) % gameState.turnOrder.length;
                     gameState.actionsLeft = 4;
+                    gameState.currentPhase = 'ACTIONS'; // Повертаємо звичайну фазу
                     broadcastState();
                 });
 
@@ -728,6 +748,7 @@ io.on('connection', (socket) => {
         const playerId = getPlayerIdForSocket(socket);
         const player = playerId ? gameState.players[playerId] : null;
         if (gameState.status !== 'PLAYING') return;
+        if (gameState.currentPhase !== 'ACTIONS') return;
         if (!playerId || !player) return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
         if (gameState.actionsLeft <= 0) return;
@@ -760,6 +781,7 @@ io.on('connection', (socket) => {
         const playerId = getPlayerIdForSocket(socket);
         const player = playerId ? gameState.players[playerId] : null;
         if (gameState.status !== 'PLAYING') return;
+        if (gameState.currentPhase !== 'ACTIONS') return;
         if (!playerId || !player) return;
         if (gameState.turnOrder[gameState.currentTurnIndex] !== playerId) return;
         if (gameState.actionsLeft <= 0) return;
@@ -829,6 +851,7 @@ io.on('connection', (socket) => {
         gameState.outbreaks = 0;
         gameState.infectionRateIndex = 0;
         gameState.infectionRate = 2;
+        gameState.currentPhase = 'ACTIONS';
         gameState.cured = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
         gameState.eradicated = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
         gameState.researchStations = ['Atlanta'];
