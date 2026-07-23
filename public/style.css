@@ -587,20 +587,23 @@ body {
     position: absolute;
     top: 15px;
     left: 50%;
-    transform: translateX(-50%); /* Центруємо рівно посередині */
-    background-color: rgba(26, 32, 44, 0.85); /* Темно-синій/сірий напівпрозорий фон */
-    color: #e2e8f0; /* Світло-сірий текст */
+    transform: translateX(-50%);
+    background-color: rgba(26, 32, 44, 0.85);
+    color: #e2e8f0;
     padding: 10px 25px;
-    border-radius: 20px; /* Заокруглені краї як на фото */
+    border-radius: 20px;
     display: flex;
+    flex-direction: row; /* Примусово вибудовує в горизонтальну лінію */
     align-items: center;
+    justify-content: center;
+    white-space: nowrap; /* Забороняє перенесення слів на новий рядок */
     gap: 15px;
     font-size: 16px;
     font-weight: bold;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.4);
     border: 1px solid #4a5568;
     z-index: 10;
-    pointer-events: none; /* Щоб кліки мишкою проходили крізь неї на мапу */
+    pointer-events: none;
 }
 
 .hud-item {
