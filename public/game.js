@@ -316,7 +316,7 @@ function updateUI() {
                 if (btnCure) btnCure.classList.add('is-hidden'); 
                 if (dispatcherMenu) dispatcherMenu.classList.add('is-hidden');
                 if (tradeMenu) tradeMenu.classList.add('is-hidden');
-                
+
             } else if (currentGameState.currentPhase === 'INFECTION') {
                 // НОВИЙ БЛОК: ФАЗА ІНФЕКЦІЇ (ПАУЗА)
                 actionsSpan.innerText = "ФАЗА ІНФЕКЦІЇ";
@@ -551,6 +551,63 @@ function updateUI() {
             deckEl.innerText = `${deckWarning} Карт у колоді: ${deckSize}`;
         } else {
             hudPanel.classList.add('is-hidden');
+        }
+    }
+    // === ОНОВЛЕННЯ СПИСКІВ СКИДУ (ІСТОРІЇ) ===
+    if (currentGameState.playerDiscard) {
+        const stats = { '#2b6cb0': 0, '#d69e2e': 0, '#1a202c': 0, '#e53e3e': 0, 'events': 0 };
+        const pList = document.getElementById('pdiscard-list');
+        pList.innerHTML = '';
+        
+        // Малюємо з кінця, щоб найновіші скинуті карти були зверху
+        [...currentGameState.playerDiscard].reverse().forEach(card => {
+            const el = document.createElement('div');
+            el.className = 'player-card';
+            if (mapData[card]) {
+                const col = mapData[card].color;
+                stats[col]++;
+                el.style.backgroundColor = col;
+                el.innerText = card;
+            } else if (card.startsWith('EVENT_')) {
+                stats['events']++;
+                el.style.backgroundColor = '#805ad5';
+                el.innerText = eventCardLabels[card] || card;
+            }
+            pList.appendChild(el);
+        });
+
+        // Малюємо статистику зверху (скільки якого кольору)
+        const pStats = document.getElementById('pdiscard-stats');
+        pStats.innerHTML = '';
+        Object.entries(stats).forEach(([key, count]) => {
+            if (count > 0) {
+                const badge = document.createElement('div');
+                badge.className = 'stat-badge';
+                const colorBox = document.createElement('div');
+                colorBox.className = 'stat-color';
+                colorBox.style.backgroundColor = key === 'events' ? '#805ad5' : key;
+                badge.appendChild(colorBox);
+                badge.innerHTML += `<span>${count}</span>`;
+                pStats.appendChild(badge);
+            }
+        });
+        if(pStats.innerHTML === '') pStats.innerHTML = '<span class="text-gray">Поки порожньо</span>';
+    }
+
+    if (currentGameState.infectionDiscard) {
+        const iList = document.getElementById('idiscard-list');
+        iList.innerHTML = '';
+        if (currentGameState.infectionDiscard.length === 0) {
+            iList.innerHTML = '<span class="text-gray">Поки порожньо</span>';
+        } else {
+            // Теж з кінця, щоб найновіші зараження були зверху
+            [...currentGameState.infectionDiscard].reverse().forEach(city => {
+                const el = document.createElement('div');
+                el.className = 'player-card';
+                el.style.backgroundColor = mapData[city] ? mapData[city].color : '#e53e3e';
+                el.innerText = city;
+                iList.appendChild(el);
+            });
         }
     }
 }
@@ -1057,5 +1114,31 @@ const btnReplay = document.getElementById('btn-replay');
 if (btnReplay) {
     btnReplay.addEventListener('click', () => {
         socket.emit('return_to_lobby');
+    });
+}
+
+// === ЛОГІКА ПАНЕЛЕЙ ІСТОРІЇ ===
+const btnPDiscard = document.getElementById('btn-toggle-pdiscard');
+const btnIDiscard = document.getElementById('btn-toggle-idiscard');
+const panelPDiscard = document.getElementById('panel-pdiscard');
+const panelIDiscard = document.getElementById('panel-idiscard');
+
+if (btnPDiscard) {
+    btnPDiscard.addEventListener('click', () => {
+        panelPDiscard.classList.toggle('open');
+        btnPDiscard.classList.toggle('active');
+        // Закриваємо іншу панель, якщо відкрита
+        panelIDiscard.classList.remove('open');
+        btnIDiscard.classList.remove('active');
+    });
+}
+
+if (btnIDiscard) {
+    btnIDiscard.addEventListener('click', () => {
+        panelIDiscard.classList.toggle('open');
+        btnIDiscard.classList.toggle('active');
+        // Закриваємо іншу панель, якщо відкрита
+        panelPDiscard.classList.remove('open');
+        btnPDiscard.classList.remove('active');
     });
 }

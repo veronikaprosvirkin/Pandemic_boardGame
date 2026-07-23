@@ -32,8 +32,10 @@ let turnSnapshots = [];
 
 function broadcastState() {
     gameState.deckSize = playerDeck.length;
+    gameState.infectionDiscard = [...infectionDiscard];
+    gameState.playerDiscard = [...playerDiscard];       
     io.emit('state_update', gameState);
-} 
+}
 
 const roles = ["Медик", "Вчений", "Диспетчер", "Дослідник", "Фахівець із карантину", "Інженер"];
 const EVENT_CARDS = [
@@ -51,10 +53,13 @@ function isCityCard(cardName) {
     return Boolean(cities[cardName]);
 }
 
-function removeCardFromHand(player, cardName) {
+function removeCardFromHand(player, cardName, toDiscard = true) {
     const index = player.cards.indexOf(cardName);
     if (index === -1) return false;
-    player.cards.splice(index, 1);
+    const removedCard = player.cards.splice(index, 1)[0];
+    if (toDiscard) {
+        playerDiscard.push(removedCard);
+    }
     return true;
 }
 
@@ -519,7 +524,7 @@ io.on('connection', (socket) => {
 
                             if (previewCards.length === 0) return;
 
-                            removeCardFromHand(player, eventCard);
+                            removeCardFromHand(player, eventCard, false);
                             pendingEvent = {
                                 playerId,
                                 eventCard,
@@ -535,7 +540,7 @@ io.on('connection', (socket) => {
                         if (eventCard === 'EVENT_RESILIENT_POPULATION') {
                             if (!infectionDiscard || infectionDiscard.length === 0) return;
 
-                            removeCardFromHand(player, eventCard);
+                            removeCardFromHand(player, eventCard, false);
                             pendingEvent = {
                                 playerId,
                                 eventCard,
@@ -619,6 +624,7 @@ io.on('connection', (socket) => {
                         for (let i = orderedCards.length - 1; i >= 0; i--) {
                             infectionDeck.push(orderedCards[i]);
                         }
+                        playerDiscard.push(pendingEvent.eventCard);
                         pendingEvent = null;
                         broadcastState();
                         return;
@@ -630,6 +636,7 @@ io.on('connection', (socket) => {
                         if (index === -1) return;
 
                         infectionDiscard.splice(index, 1);
+                        playerDiscard.push(pendingEvent.eventCard);
                         pendingEvent = null;
                         broadcastState();
                         return;
@@ -765,7 +772,7 @@ io.on('connection', (socket) => {
             if (player.role === "Інженер") {
                 canBuild = true;
             } else if (player.cards.includes(player.city)) {
-                player.cards.splice(player.cards.indexOf(player.city), 1);
+                removeCardFromHand(player, player.city);
                 canBuild = true;
             }
 
@@ -817,7 +824,7 @@ io.on('connection', (socket) => {
 
                 for (let i = 0; i < needed; i++) {
                     const cardToRemove = cityCards[i];
-                    player.cards.splice(player.cards.indexOf(cardToRemove), 1);
+                    removeCardFromHand(player, cardToRemove);
                 }
 
                 gameState.actionsLeft--;
@@ -838,13 +845,11 @@ io.on('connection', (socket) => {
         const playerId = getPlayerIdForSocket(socket);
         const player = playerId ? gameState.players[playerId] : null;
         if (player && player.cards.length > 7) {
-            const idx = player.cards.indexOf(cardName);
-            if (idx !== -1) {
-                player.cards.splice(idx, 1);
-                broadcastState();
-            }
+            removeCardFromHand(player, cardName); // Використовуємо нашу функцію
+            broadcastState();
         }
     });
+    
     // === ОКРЕМА ФУНКЦІЯ ОЧИЩЕННЯ ГРИ ===
     function resetGameState() {
         gameState.status = 'LOBBY';

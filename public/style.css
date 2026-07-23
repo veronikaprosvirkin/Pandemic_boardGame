@@ -631,3 +631,103 @@ body {
     50% { opacity: 0.4; }
     100% { opacity: 1; }
 }
+
+
+/* =========================================
+   БІЧНІ ПАНЕЛІ ІСТОРІЇ
+========================================= */
+#side-history-menu {
+    position: absolute;
+    left: 0;
+    top: auto;
+    bottom: 40px; /* Перенесли в нижній лівий кут (пустий океан) */
+    z-index: 100;
+    display: flex;
+}
+
+.history-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 102; 
+}
+
+.history-btn {
+    background-color: #2d3748;
+    color: white;
+    border: 1px solid #4a5568;
+    border-left: none;
+    width: 50px; /* Зробили кнопки квадратними */
+    height: 50px;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px; /* Збільшили емодзі для гарного вигляду */
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    transition: 0.2s;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+}
+
+.history-btn:hover { background-color: #4a5568; }
+.history-btn.active {
+    background-color: #3182ce;
+    border-color: #63b3ed;
+}
+
+.side-panel {
+    position: absolute;
+    left: -220px;
+    bottom: 0; 
+    top: auto;
+    width: 180px; /* Базова ширина */
+    height: 350px; /* Базова висота, щоб панель не була на весь екран одразу */
+    min-width: 140px; /* Обмеження: не можна зробити занадто вузьким */
+    max-width: 400px; /* Обмеження: не можна перекрити всю мапу */
+    min-height: 150px; /* Обмеження: не можна стиснути до нуля */
+    max-height: 85vh; /* Обмеження: не вилізе за верхній край екрана */
+    background: rgba(26, 32, 44, 0.95);
+    border: 1px solid #4a5568;
+    border-radius: 0 10px 10px 0;
+    padding: 15px;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
+    transition: left 0.3s ease;
+    overflow: auto; /* Дозволяє скролити вміст і є обов'язковим для resize */
+    resize: both; /* Додає можливість ручного зміни розміру гравцем */
+    z-index: 101;
+}
+
+.side-panel.open { 
+    left: 50px; /* Виїжджає рівно з-під наших 50-піксельних квадратних кнопок */
+}
+
+.discard-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #4a5568;
+}
+
+.stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.stat-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.5);
+}
+
+.discard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
