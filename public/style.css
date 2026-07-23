@@ -632,16 +632,17 @@ body {
     100% { opacity: 1; }
 }
 
+
 /* =========================================
    БІЧНІ ПАНЕЛІ ІСТОРІЇ
 ========================================= */
 #side-history-menu {
     position: absolute;
     left: 0;
-    top: 150px; /* Трохи нижче верхнього краю */
+    top: auto;
+    bottom: 40px; /* Перенесли в нижній лівий кут (пустий океан) */
     z-index: 100;
     display: flex;
-    align-items: flex-start;
 }
 
 .history-buttons {
@@ -656,14 +657,17 @@ body {
     color: white;
     border: 1px solid #4a5568;
     border-left: none;
-    padding: 10px 15px;
+    width: 50px; /* Зробили кнопки квадратними */
+    height: 50px;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px; /* Збільшили емодзі для гарного вигляду */
     border-radius: 0 8px 8px 0;
     cursor: pointer;
-    font-weight: bold;
     transition: 0.2s;
     box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
-    width: 170px;
-    text-align: left;
 }
 
 .history-btn:hover { background-color: #4a5568; }
@@ -674,22 +678,28 @@ body {
 
 .side-panel {
     position: absolute;
-    left: -320px; /* Схована за екраном */
-    top: 0;
-    width: 280px;
-    max-height: 70vh;
+    left: -220px;
+    bottom: 0; 
+    top: auto;
+    width: 180px; /* Базова ширина */
+    height: 350px; /* Базова висота, щоб панель не була на весь екран одразу */
+    min-width: 140px; /* Обмеження: не можна зробити занадто вузьким */
+    max-width: 400px; /* Обмеження: не можна перекрити всю мапу */
+    min-height: 150px; /* Обмеження: не можна стиснути до нуля */
+    max-height: 85vh; /* Обмеження: не вилізе за верхній край екрана */
     background: rgba(26, 32, 44, 0.95);
     border: 1px solid #4a5568;
     border-radius: 0 10px 10px 0;
     padding: 15px;
     box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
     transition: left 0.3s ease;
-    overflow-y: auto;
+    overflow: auto; /* Дозволяє скролити вміст і є обов'язковим для resize */
+    resize: both; /* Додає можливість ручного зміни розміру гравцем */
     z-index: 101;
 }
 
 .side-panel.open { 
-    left: 170px; /* Виїжджає поруч із кнопками */
+    left: 50px; /* Виїжджає рівно з-під наших 50-піксельних квадратних кнопок */
 }
 
 .discard-stats {
