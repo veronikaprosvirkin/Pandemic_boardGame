@@ -631,3 +631,93 @@ body {
     50% { opacity: 0.4; }
     100% { opacity: 1; }
 }
+
+/* =========================================
+   БІЧНІ ПАНЕЛІ ІСТОРІЇ
+========================================= */
+#side-history-menu {
+    position: absolute;
+    left: 0;
+    top: 150px; /* Трохи нижче верхнього краю */
+    z-index: 100;
+    display: flex;
+    align-items: flex-start;
+}
+
+.history-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 102; 
+}
+
+.history-btn {
+    background-color: #2d3748;
+    color: white;
+    border: 1px solid #4a5568;
+    border-left: none;
+    padding: 10px 15px;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    font-weight: bold;
+    transition: 0.2s;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    width: 170px;
+    text-align: left;
+}
+
+.history-btn:hover { background-color: #4a5568; }
+.history-btn.active {
+    background-color: #3182ce;
+    border-color: #63b3ed;
+}
+
+.side-panel {
+    position: absolute;
+    left: -320px; /* Схована за екраном */
+    top: 0;
+    width: 280px;
+    max-height: 70vh;
+    background: rgba(26, 32, 44, 0.95);
+    border: 1px solid #4a5568;
+    border-radius: 0 10px 10px 0;
+    padding: 15px;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
+    transition: left 0.3s ease;
+    overflow-y: auto;
+    z-index: 101;
+}
+
+.side-panel.open { 
+    left: 170px; /* Виїжджає поруч із кнопками */
+}
+
+.discard-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #4a5568;
+}
+
+.stat-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.stat-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid rgba(255,255,255,0.5);
+}
+
+.discard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}

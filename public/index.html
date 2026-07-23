@@ -21,6 +21,27 @@
     <!-- ТУТ ВАЖЛИВА СТРУКТУРА: game-view має бути контейнером (flex або grid), щоб canvas і ui-panel були поруч -->
     <div id="game-view" class="is-hidden game-view">
         
+        <!-- БІЧНІ ПАНЕЛІ ІСТОРІЇ (СКИДУ) -->
+        <div id="side-history-menu">
+            <div class="history-buttons">
+                <!-- Тепер Відбій інфекцій зверху -->
+                <button id="btn-toggle-idiscard" class="history-btn">☣️ Відбій інфекцій</button>
+                <button id="btn-toggle-pdiscard" class="history-btn">🃏 Скид гравців</button>
+            </div>
+            
+            <div id="panel-pdiscard" class="side-panel">
+                <h3 style="margin-top: 0; color: #63b3ed;">Скид гравців</h3>
+                <div id="pdiscard-stats" class="discard-stats"></div>
+                <div id="pdiscard-list" class="discard-list"></div>
+            </div>
+
+            <div id="panel-idiscard" class="side-panel">
+                <h3 style="margin-top: 0; color: #fc8181;">Відбій інфекцій</h3>
+                <p style="font-size: 11px; color: #a0aec0; margin-top: -10px;">(Очищується після Епідемії)</p>
+                <div id="idiscard-list" class="discard-list"></div>
+            </div>
+        </div>
+        
         <!-- ЛІВА ЧАСТИНА: МАПА -->
         <div id="game-container" style="position: relative;">
             <canvas id="gameCanvas" width="1200" height="675"></canvas>
