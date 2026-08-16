@@ -403,7 +403,13 @@ io.on('connection', (socket) => {
                         moved = true;
                     }
 
-                    if (!moved && currentCity && currentCity.connections.includes(targetCity)) {
+                    // Двостороння перевірка сусідніх міст (захист від помилок у JSON)
+                    const isConnected = currentCity && (
+                        currentCity.connections.includes(targetCity) || 
+                        (cities[targetCity] && cities[targetCity].connections.includes(movingPlayer.city))
+                    );
+
+                    if (!moved && isConnected) {
                         moved = true; // Звичайний рух у сусіднє місто
                     } else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
                         moved = true; // ДИСПЕТЧЕР: переміщує БУДЬ-ЯКУ фішку туди, де вже є інша фішка

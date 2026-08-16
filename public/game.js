@@ -641,8 +641,16 @@ function draw() {
             activeCity = movingPlayer.city;
             const activeCityData = mapData[activeCity];
             
-            if (activeCityData && activeCityData.connections) {
-                reachableCities.push(...activeCityData.connections); 
+            if (activeCityData) {
+                if (activeCityData.connections) {
+                    reachableCities.push(...activeCityData.connections); 
+                }
+                // Додаємо зворотні зв'язки для підсвічування
+                Object.entries(mapData).forEach(([name, data]) => {
+                    if (data.connections && data.connections.includes(activeCity)) {
+                        reachableCities.push(name);
+                    }
+                });
             }
             if (me.role === "Диспетчер" && targetPawnId !== myPlayerId) {
                 Object.values(currentGameState.players).forEach(p => {
