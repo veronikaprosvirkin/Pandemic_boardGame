@@ -13,6 +13,7 @@ let cities = JSON.parse(fs.readFileSync('cities.json', 'utf8'));
 
 let gameState = {
     status: 'LOBBY',
+    difficulty: 4,
     players: {},
     turnOrder: [],
     currentTurnIndex: 0,
@@ -180,6 +181,33 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('set_nickname', (newName) => {
+        const { playerId } = getPlayerForSocket(socket);
+        if (!playerId || !gameState.players[playerId] || gameState.status !== 'LOBBY') return;
+        
+        const trimmed = typeof newName === 'string' ? newName.trim().substring(0, 15) : '';
+        if (!trimmed) return;
+
+        const isTaken = Object.values(gameState.players).some(p => p.id !== playerId && p.name.toLowerCase() === trimmed.toLowerCase());
+        if (isTaken) {
+            socket.emit('nickname_error', '❌ Цей нік вже зайнятий!');
+            return;
+        }
+
+        gameState.players[playerId].name = trimmed;
+        socket.emit('nickname_error', ''); 
+        io.emit('lobby_update', gameState.players);
+    });
+
+    socket.on('set_difficulty', (level) => {
+        if (gameState.status === 'LOBBY') {
+            gameState.difficulty = parseInt(level) || 5;
+            Object.values(gameState.players).forEach(p => p.isReady = false);
+            io.emit('difficulty_updated', gameState.difficulty);
+            io.emit('lobby_update', gameState.players);
+        }
+    });
+
     function checkGameStart() {
         const playersArr = Object.values(gameState.players);
         
@@ -250,7 +278,7 @@ io.on('connection', (socket) => {
                 }
             });
 
-            const numEpidemics = 4;
+            const numEpidemics = gameState.difficulty;
             const piles = Array.from({ length: numEpidemics }, () => []);
             initialPlayerDeck.forEach((card, index) => {
                 piles[index % numEpidemics].push(card);
@@ -373,6 +401,7 @@ io.on('connection', (socket) => {
                     const pawnId = typeof data === 'object' && data.pawnId ? data.pawnId : playerId;
                     const discardCard = typeof data === 'object' ? data.discardCard : null;
                     const specialFlight = typeof data === 'object' ? data.specialFlight === true : false;
+                    const flightType = typeof data === 'object' ? data.flightType : null;
 
                     if (gameState.status !== 'PLAYING') return;
                     if (gameState.currentPhase !== 'ACTIONS') return;
@@ -414,13 +443,26 @@ io.on('connection', (socket) => {
                     } else if (!moved && isDispatcher && Object.values(gameState.players).some(p => p.city === targetCity && p.id !== movingPlayer.id)) {
                         moved = true; // ДИСПЕТЧЕР: переміщує БУДЬ-ЯКУ фішку туди, де вже є інша фішка
                     } else if (!moved && gameState.researchStations.includes(movingPlayer.city) && gameState.researchStations.includes(targetCity)) {
-                        moved = true; // СЛУЖБОВИЙ РЕЙС: від станції до станції (безкоштовно)
-                    } else if (!moved && player.cards.includes(targetCity)) {
-                        removeCardFromHand(player, targetCity); // ПРЯМИЙ РЕЙС (витрачає карту міста, КУДИ летить)
-                        moved = true;
-                    } else if (!moved && player.cards.includes(movingPlayer.city)) {
-                        removeCardFromHand(player, movingPlayer.city); // ЧАРТЕРНИЙ РЕЙС (витрачає карту міста, З ЯКОГО летить)
-                        moved = true;
+                        moved = true; // СЛУЖБОВИЙ РЕЙС
+                    } else if (!moved) {
+                        let cardToDiscard = null;
+                        
+                        if (flightType === 'charter' && player.cards.includes(movingPlayer.city)) {
+                            cardToDiscard = movingPlayer.city;
+                        } else if (flightType === 'direct' && player.cards.includes(targetCity)) {
+                            cardToDiscard = targetCity;
+                        } else {
+                            if (player.cards.includes(targetCity)) {
+                                cardToDiscard = targetCity;
+                            } else if (player.cards.includes(movingPlayer.city)) {
+                                cardToDiscard = movingPlayer.city;
+                            }
+                        }
+
+                        if (cardToDiscard) {
+                            removeCardFromHand(player, cardToDiscard);
+                            moved = true;
+                        }
                     }
 
                     if (moved) {
@@ -862,6 +904,7 @@ io.on('connection', (socket) => {
         gameState.outbreaks = 0;
         gameState.infectionRateIndex = 0;
         gameState.infectionRate = 2;
+        gameState.difficulty = 5;
         gameState.currentPhase = 'ACTIONS';
         gameState.cured = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };
         gameState.eradicated = { '#2b6cb0': false, '#d69e2e': false, '#1a202c': false, '#e53e3e': false };

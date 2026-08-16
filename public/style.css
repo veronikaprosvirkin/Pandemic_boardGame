@@ -731,3 +731,53 @@ body {
     flex-direction: column;
     gap: 5px;
 }
+
+/* =========================================
+   КОЛЬОРИ РОЛЕЙ ТА НОВІ ЕЛЕМЕНТИ
+========================================= */
+.role-medic { color: #ed8936; font-weight: bold; }
+.role-scientist { color: #f7fafc; font-weight: bold; }
+.role-dispatcher { color: #b794f4; font-weight: bold; }
+.role-researcher { color: #b7791f; font-weight: bold; }
+.role-quarantine { color: #48bb78; font-weight: bold; }
+.role-engineer { color: #fc8181; font-weight: bold; }
+
+/* Лобі */
+.lobby-settings {
+    margin: 15px 0;
+    text-align: left;
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.lobby-input-group {
+    margin-bottom: 15px;
+}
+
+.input-label {
+    color: #a0aec0;
+    font-size: 0.9em;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.error-text {
+    color: #fc8181;
+    font-size: 12px;
+    margin: 5px 0 0 0;
+    min-height: 14px;
+}
+
+/* Модалка вибору рейсу */
+.btn-charter { background-color: #ed8936; }
+.btn-charter:hover { background-color: #dd6b20; }
+.btn-direct { background-color: #3182ce; }
+.btn-direct:hover { background-color: #2b6cb0; }
+
+.modal-hint-text {
+    font-size: 11px;
+    color: #a0aec0;
+    margin-top: 15px;
+    text-align: center;
+}
