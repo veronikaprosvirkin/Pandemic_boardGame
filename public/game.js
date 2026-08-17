@@ -34,6 +34,45 @@ const SCALE_Y = 1.0;
 const OFFSET_X = 0;
 const OFFSET_Y = 0;
 
+const roleClasses = {
+    "Медик": "role-medic",
+    "Вчений": "role-scientist",
+    "Диспетчер": "role-dispatcher",
+    "Дослідник": "role-researcher",
+    "Фахівець із карантину": "role-quarantine",
+    "Інженер": "role-engineer"
+};
+
+const roleColors = {
+    "Медик": "#ed8936",            // Оранжевий
+    "Вчений": "#ffffff",           // Білий
+    "Диспетчер": "#ed64a6",        // Рожевий
+    "Дослідник": "#8B4513",        // Коричневий
+    "Фахівець із карантину": "#2f855a", // Темно-зелений
+    "Інженер": "#68d391"           // Світло-зелений
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const nicknameInput = document.getElementById('player-nickname-input');
+    const difficultySelect = document.getElementById('difficulty-select');
+
+    if (difficultySelect) {
+        difficultySelect.addEventListener('change', (e) => {
+            socket.emit('set_difficulty', e.target.value);
+        });
+    }
+});
+
+socket.on('nickname_error', (msg) => {
+    const err = document.getElementById('nickname-error');
+    if (err) err.innerText = msg;
+});
+
+socket.on('difficulty_updated', (level) => {
+    const sel = document.getElementById('difficulty-select');
+    if (sel) sel.value = level;
+});
+
 function getCoords(originalX, originalY) {
     return {
         x: (originalX * SCALE_X) + OFFSET_X,
@@ -137,12 +176,46 @@ socket.on('lobby_update', (players) => {
         if (!p.isReady) allReady = false;
 
         const li = document.createElement('li');
-        li.style.padding = "10px";
-        li.style.borderBottom = "1px solid #4a5568";
-        li.style.color = p.isReady ? "#48bb78" : "#e2e8f0";
-        li.innerHTML = `<strong>${p.name}</strong> - ${p.isReady ? 'Готовий ✔️' : 'Обирає...'}`;
+        li.className = p.isReady ? 'lobby-item-ready' : 'lobby-item-waiting';
+
+        if (p.id === myPlayerId) {
+            // Для самого себе генеруємо поле вводу
+            li.innerHTML = `
+                <div class="lobby-player-info">
+                    <span title="Це ви">✏️</span>
+                    <input type="text" class="inline-name-input" id="inline-nickname" value="${p.name}" maxlength="15" placeholder="Введіть нік...">
+                </div>
+                <span>${p.isReady ? 'Готовий ✔️' : 'Обирає...'}</span>
+            `;
+        } else {
+            // Для інших гравців просто текст
+            li.innerHTML = `
+                <div class="lobby-player-info">
+                    <span title="Інший гравець">👤</span>
+                    <strong>${p.name}</strong>
+                </div>
+                <span>${p.isReady ? 'Готовий ✔️' : 'Обирає...'}</span>
+            `;
+        }
+        
         lobbyPlayersList.appendChild(li);
     });
+
+    // Додаємо обробник подій для поля вводу (якщо воно з'явилося)
+    const inlineNameInput = document.getElementById('inline-nickname');
+    if (inlineNameInput) {
+        // Коли користувач закінчив вводити текст і клікнув десь інде
+        inlineNameInput.addEventListener('change', (e) => {
+            socket.emit('set_nickname', e.target.value);
+        });
+        
+        // Коли користувач натискає Enter - знімаємо фокус з поля
+        inlineNameInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                inlineNameInput.blur();
+            }
+        });
+    }
 
     const statusText = document.getElementById('lobby-status');
     if (statusText) {
@@ -197,12 +270,16 @@ socket.on('state_update', (newState) => {
     currentGameState = newState;
     updateUI();
 });
-
 function updateUI() {
     if (!currentGameState.players || !currentGameState.players[myPlayerId]) return;
     
     const me = currentGameState.players[myPlayerId];
-    document.getElementById('my-role').innerText = me.role;
+    
+    const myRoleEl = document.getElementById('my-role');
+    myRoleEl.innerText = `${me.role} (${me.name || 'Очікування...'})`;
+    myRoleEl.className = ''; 
+    myRoleEl.classList.add(roleClasses[me.role] || 'text-blue');
+    
     document.getElementById('my-city').innerText = me.city;
 
     const descEl = document.getElementById('my-role-desc');
@@ -227,10 +304,11 @@ function updateUI() {
                 const cityColor = mapData[cardCity] ? mapData[cardCity].color : "#718096";
                 cardEl.innerText = cardCity;
                 cardEl.className = 'player-card'; 
-                cardEl.style.backgroundColor = cityColor; 
+                cardEl.style.backgroundColor = cityColor; // Динамічний колір з бази (це ок)
+                
+                // Використовуємо КЛАС замість інлайн-стилів
                 if (isOverLimit) {
-                    cardEl.style.cursor = "pointer";
-                    cardEl.style.border = "2px solid #e53e3e"; 
+                    cardEl.classList.add('card-over-limit'); 
                     cardEl.onclick = () => socket.emit('discard_card', cardCity);
                 }
                 cardsContainer.appendChild(cardEl);
@@ -243,19 +321,42 @@ function updateUI() {
         if (eventCards.length > 0) {
             eventCards.forEach(card => {
                 const cardEl = document.createElement('div');
-                cardEl.className = 'player-card'; 
-                cardEl.style.backgroundColor = "#805ad5"; // Фіолетовий колір для подій
-                cardEl.innerHTML = `<strong style="font-size:12px;">${eventCardLabels[card]}</strong>`;
+                // Додаємо класи player-card та event-card (event-card вже має фіолетовий фон у CSS)
+                cardEl.className = 'player-card event-card'; 
+                // Використовуємо клас event-card-title замість інлайн-шрифта
+                cardEl.innerHTML = `<strong class="event-card-title">${eventCardLabels[card]}</strong>`;
                 
-                // Кнопка для використання події
+                // Використовуємо КЛАС замість інлайн-стилів
+                if (isOverLimit) {
+                    cardEl.classList.add('card-over-limit');
+                    cardEl.onclick = () => {
+                        let html = `
+                            <div class="event-modal-body">
+                                <button class="action-button btn-charter" onclick="confirmEventAction('play', '${card}')">
+                                    ⚡ Зіграти подію
+                                </button>
+                                <button class="action-button end-turn-btn" onclick="confirmEventAction('discard', '${card}')">
+                                    🗑️ Скинути у відбій
+                                </button>
+                                <button class="action-button btn-cancel" onclick="document.getElementById('event-modal').classList.add('is-hidden')">
+                                    Скасувати
+                                </button>
+                            </div>
+                        `;
+                        openEventModal('Ліміт карт!', `Що ви хочете зробити з картою "${eventCardLabels[card]}"?`, html, 'EVENT_CHOICE');
+                    };
+                } 
+                
+                // Кнопка для використання події залишається
                 if (currentGameState.status === 'PLAYING') {
                     const btnPlay = document.createElement('button');
                     btnPlay.innerText = "Зіграти";
                     btnPlay.className = "action-button event-card-play";
-                    btnPlay.style.marginTop = "5px";
-                    btnPlay.style.padding = "4px";
-                    btnPlay.style.fontSize = "11px";
-                    btnPlay.onclick = () => handlePlayEventCard(card);
+                    
+                    btnPlay.onclick = (e) => {
+                        e.stopPropagation(); // Запобігає виклику модалки скидання при кліку на "Зіграти"
+                        handlePlayEventCard(card);
+                    };
                     cardEl.appendChild(btnPlay);
                 }
                 eventCardsContainer.appendChild(cardEl);
@@ -428,10 +529,15 @@ function updateUI() {
                 if (me.role === "Диспетчер") {
                     if (dispatcherMenu && dispatcherSelect) {
                         dispatcherMenu.classList.remove('is-hidden');
-                        dispatcherSelect.innerHTML = `<option value="${myPlayerId}">Моя фішка (Диспетчер)</option>`;
+                        
+                        const myDisplayName = me.name.startsWith('Гравець ') ? me.role : me.name;
+                        dispatcherSelect.innerHTML = `<option value="${myPlayerId}">Моя фішка (${myDisplayName})</option>`;
+                        
                         Object.values(currentGameState.players).forEach(p => {
                             if (p.id !== myPlayerId) {
-                                dispatcherSelect.innerHTML += `<option value="${p.id}">Фішка: ${p.role} (${p.city})</option>`;
+                                // РОЗУМНЕ ІМ'Я для інших
+                                const displayName = p.name.startsWith('Гравець ') ? p.role : p.name;
+                                dispatcherSelect.innerHTML += `<option value="${p.id}">Фішка: ${displayName} (${p.city})</option>`;
                             }
                         });
                     }
@@ -450,29 +556,41 @@ function updateUI() {
                     if (otherPlayersHere.length > 0) {
                         tradeMenu.classList.remove('is-hidden');
                         otherPlayersHere.forEach(other => {
+                            // РОЗУМНЕ ІМ'Я ДЛЯ СПИСКУ
+                            const displayName = other.name.startsWith('Гравець ') ? other.role : other.name;
+
+                            // === Я ВІДДАЮ КАРТУ ===
                             if (me.role === "Дослідник") {
                                 me.cards.forEach(c => {
-                                    tradeSelect.innerHTML += `<option value="give|${other.id}|${c}">Віддати ${c} (${other.role})</option>`;
-                                    hasTrades = true;
+                                    // БЛОКУЄМО ПЕРЕДАЧУ КАРТ ПОДІЙ
+                                    if (!c.startsWith('EVENT_')) { 
+                                        tradeSelect.innerHTML += `<option value="give|${other.id}|${c}">Віддати ${c} (${displayName})</option>`;
+                                        hasTrades = true;
+                                    }
                                 });
                             } else if (me.cards.includes(me.city)) {
-                                tradeSelect.innerHTML += `<option value="give|${other.id}|${me.city}">Віддати ${me.city} (${other.role})</option>`;
+                                tradeSelect.innerHTML += `<option value="give|${other.id}|${me.city}">Віддати ${me.city} (${displayName})</option>`;
                                 hasTrades = true;
                             }
 
+                            // === Я БЕРУ КАРТУ ===
                             if (other.role === "Дослідник") {
                                 other.cards.forEach(c => {
-                                    tradeSelect.innerHTML += `<option value="take|${other.id}|${c}">Взяти ${c} (${other.role})</option>`;
-                                    hasTrades = true;
+                                    // БЛОКУЄМО ЗАБИРАННЯ КАРТ ПОДІЙ
+                                    if (!c.startsWith('EVENT_')) { 
+                                        tradeSelect.innerHTML += `<option value="take|${other.id}|${c}">Взяти ${c} (${displayName})</option>`;
+                                        hasTrades = true;
+                                    }
                                 });
                             } else if (other.cards.includes(me.city)) {
-                                tradeSelect.innerHTML += `<option value="take|${other.id}|${me.city}">Взяти ${me.city} (${other.role})</option>`;
+                                tradeSelect.innerHTML += `<option value="take|${other.id}|${me.city}">Взяти ${me.city} (${displayName})</option>`;
                                 hasTrades = true;
                             }
                         });
 
+                        // Якщо гравці є, але доступних для обміну карт немає
                         if (!hasTrades) {
-                            tradeSelect.innerHTML = `<option value="">Потрібна карта міста ${me.city}!</option>`;
+                            tradeSelect.innerHTML = `<option value="">Немає доступних карт для обміну!</option>`;
                             if (btnTradeConfirm) {
                                 btnTradeConfirm.disabled = true;
                                 btnTradeConfirm.style.opacity = "0.5";
@@ -491,7 +609,10 @@ function updateUI() {
                 }
             }
         } else {
-            if (activePlayer) turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role}`;
+            if (activePlayer) {
+                turnIndicator.innerText = `⏳ Ходить: ${activePlayer.role} (${activePlayer.name || 'Очікування...'})`;
+                turnIndicator.className = 'global-stats-title ' + (roleClasses[activePlayer.role] || 'text-gray');
+            }
             turnIndicator.classList.remove('turn-indicator-active');
             turnIndicator.classList.add('turn-indicator-waiting');
             actionsSpan.innerText = "Очікування...";
@@ -822,7 +943,7 @@ function draw() {
                 const offsetX = Math.cos(angle) * radius;
                 const offsetY = Math.sin(angle) * radius;
 
-                ctx.fillStyle = player.id === myPlayerId ? "#48bb78" : "#ed8936";
+                ctx.fillStyle = roleColors[player.role] || "#a0aec0";
                 ctx.beginPath();
                 ctx.arc(pos.x + offsetX, pos.y + offsetY, 9, 0, Math.PI * 2);
                 
@@ -834,7 +955,7 @@ function draw() {
                 ctx.shadowBlur = 0; 
                 ctx.shadowOffsetY = 0;
 
-                ctx.strokeStyle = "white";
+                ctx.strokeStyle = player.role === "Вчений" ? "#4a5568" : "white";
                 ctx.lineWidth = 2;
                 ctx.stroke();
             }
@@ -936,7 +1057,28 @@ canvas.addEventListener('click', (e) => {
         if (sel) targetPawnId = sel.value;
     }
     
-    socket.emit('move_player', { targetCity: clickedCity, pawnId: targetPawnId });
+    const movingPlayer = currentGameState.players[targetPawnId];
+    
+    // Якщо гравець має на руках ОБИДВІ карти (свого поточного міста і цільового)
+    if (me.cards.includes(movingPlayer.city) && me.cards.includes(clickedCity) && movingPlayer.city !== clickedCity) {
+        let html = `
+            <div class="event-modal-body">
+                <button class="action-button btn-charter" onclick="confirmFlightChoice('charter', '${clickedCity}', '${targetPawnId}')">
+                    ✈️ Чартерний рейс (Скинути: ${movingPlayer.city})
+                </button>
+                <button class="action-button btn-direct" onclick="confirmFlightChoice('direct', '${clickedCity}', '${targetPawnId}')">
+                    🚀 Прямий рейс (Скинути: ${clickedCity})
+                </button>
+                <button class="action-button btn-cancel" onclick="document.getElementById('event-modal').classList.add('is-hidden')">
+                    Скасувати
+                </button>
+            </div>
+            <p class="modal-hint-text">*Оберіть карту, яку хочете пожертвувати</p>
+        `;
+        openEventModal('Вибір типу рейсу', 'У вас є карти обох міст. Яку карту ви хочете використати?', html, 'FLIGHT_CHOICE');
+    } else {
+        socket.emit('move_player', { targetCity: clickedCity, pawnId: targetPawnId });
+    }
 });
 
 // КІНЕЦЬ ГРИ ТА СПОВІЩЕННЯ
@@ -1039,7 +1181,10 @@ function handlePlayEventCard(cardId) {
         showNotification('📍 Клікніть на будь-яке місто на карті, щоб побудувати там станцію.', 'card', '#d69e2e');
     } else if (cardId === 'EVENT_AIRLIFT') {
         let html = `<select id="modal-player-select" class="trade-select modal-select-full">`;
-        Object.values(currentGameState.players).forEach(p => html += `<option value="${p.id}">${p.role} (${p.city})</option>`);
+        Object.values(currentGameState.players).forEach(p => {
+            const displayName = p.name.startsWith('Гравець ') ? p.role : p.name;
+            html += `<option value="${p.id}">${displayName} (${p.city})</option>`;
+        });
         html += `</select>`;
         openEventModal('Повітряний міст', 'Оберіть гравця для переміщення, натисніть "Підтвердити", а ПОТІМ клікніть на місто на карті:', html, cardId);
     } else if (cardId === 'EVENT_RESILIENT_POPULATION' || cardId === 'EVENT_FORECAST') {
@@ -1052,6 +1197,16 @@ function openEventModal(title, desc, bodyHtml, cardId) {
     eventModalTitle.innerText = title;
     eventModalDesc.innerText = desc;
     eventModalBody.innerHTML = bodyHtml;
+
+    const actionsDiv = document.querySelector('.event-modal-actions');
+    if (actionsDiv) {
+        if (cardId === 'FLIGHT_CHOICE' || cardId === 'EVENT_CHOICE') {
+            actionsDiv.classList.add('is-hidden'); // Замість інлайн-стилю
+        } else {
+            actionsDiv.classList.remove('is-hidden'); // Замість інлайн-стилю
+        }
+    }
+
     eventModal.classList.remove('is-hidden');
 }
 
@@ -1150,3 +1305,24 @@ if (btnIDiscard) {
         btnPDiscard.classList.remove('active');
     });
 }
+
+window.confirmFlightChoice = function(type, city, pawnId) {
+    socket.emit('move_player', { targetCity: city, pawnId: pawnId, flightType: type });
+    const eventModal = document.getElementById('event-modal');
+    if (eventModal) eventModal.classList.add('is-hidden');
+    activeEventModal = null;
+};
+
+window.confirmEventAction = function(action, cardId) {
+    // Ховаємо модалку
+    const eventModal = document.getElementById('event-modal');
+    if (eventModal) eventModal.classList.add('is-hidden');
+    activeEventModal = null;
+    
+    // Виконуємо вибрану дію
+    if (action === 'play') {
+        handlePlayEventCard(cardId);
+    } else if (action === 'discard') {
+        socket.emit('discard_card', cardId);
+    }
+};
