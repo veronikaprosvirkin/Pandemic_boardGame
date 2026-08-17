@@ -731,3 +731,137 @@ body {
     flex-direction: column;
     gap: 5px;
 }
+
+/* =========================================
+   КОЛЬОРИ РОЛЕЙ ТА НОВІ ЕЛЕМЕНТИ
+========================================= */
+.role-medic { color: #ed8936; font-weight: bold; }
+.role-scientist { color: #f7fafc; font-weight: bold; }
+.role-dispatcher { color: #b794f4; font-weight: bold; }
+.role-researcher { color: #b7791f; font-weight: bold; }
+.role-quarantine { color: #48bb78; font-weight: bold; }
+.role-engineer { color: #fc8181; font-weight: bold; }
+
+/* Лобі */
+.lobby-settings {
+    margin: 15px 0;
+    text-align: left;
+    background: rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.lobby-input-group {
+    margin-bottom: 15px;
+}
+
+.input-label {
+    color: #a0aec0;
+    font-size: 0.9em;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.error-text {
+    color: #fc8181;
+    font-size: 12px;
+    margin: 5px 0 0 0;
+    min-height: 14px;
+}
+
+/* Модалка вибору рейсу */
+.btn-charter { background-color: #ed8936; }
+.btn-charter:hover { background-color: #dd6b20; }
+.btn-direct { background-color: #3182ce; }
+.btn-direct:hover { background-color: #2b6cb0; }
+
+.modal-hint-text {
+    font-size: 11px;
+    color: #a0aec0;
+    margin-top: 15px;
+    text-align: center;
+}
+
+.card-over-limit {
+    cursor: pointer !important;
+    border: 2px solid #e53e3e !important;
+}
+
+/* =========================================
+   НОВЕ ЛОБІ (INLINE РЕДАГУВАННЯ ТА КУТОК)
+========================================= */
+
+/* Блок складності у правому верхньому кутку */
+.lobby-top-right {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: rgba(45, 55, 72, 0.85); /* Колір панелі */
+    padding: 10px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid #4a5568;
+}
+
+.lobby-top-right .input-label {
+    margin-bottom: 0; /* Вирівнюємо текст по центру з селектом */
+    font-weight: bold;
+}
+/* Inline поле для вводу імені */
+.inline-name-input {
+    background: rgba(26, 32, 44, 0.8);
+    border: 1px solid #4a5568;
+    color: #63b3ed; /* Синій колір для тексту, щоб виділялося */
+    font-size: 1em;
+    font-weight: bold;
+    font-family: inherit;
+    width: 140px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: 0.2s;
+}
+
+.inline-name-input:hover {
+    border-color: #718096;
+}
+
+.inline-name-input:focus {
+    border-color: #63b3ed;
+    outline: none;
+    box-shadow: 0 0 5px rgba(99, 179, 237, 0.5);
+}
+
+/* Красиві плашки для кожного гравця у списку */
+.lobby-item-ready, .lobby-item-waiting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* Розносить нік і статус по різних краях */
+    padding: 12px 15px;
+    font-size: 1.05em;
+    background: rgba(0, 0, 0, 0.2); /* Темний фон плашки */
+    margin-bottom: 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.lobby-item-waiting {
+    color: #e2e8f0;
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.lobby-item-ready {
+    color: #48bb78;
+    border-color: rgba(72, 187, 120, 0.4);
+    background: rgba(72, 187, 120, 0.05); /* Легке зелене підсвічування */
+}
+
+/* Група: іконка + інпут/текст */
+.lobby-player-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
